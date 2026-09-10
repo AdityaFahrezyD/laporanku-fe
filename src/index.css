@@ -1,0 +1,53 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-base: #F1ECE9;
+  --color-secondary: #A45F1A;
+  --color-primary: #1F444C;
+  --color-muted: #707876;
+  --font-sans: 'Segoe UI', system-ui, sans-serif;
+}
+
+:root {
+  font-family: var(--font-sans);
+  color: #1F444C;
+  background: #F1ECE9;
+  color-scheme: light;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:not(:disabled),
+a {
+  cursor: pointer;
+}
+
+::selection {
+  background: #A45F1A;
+  color: white;
+}
+
+:focus-visible {
+  outline: 2px solid #A45F1A;
+  outline-offset: 4px;
+}
+
+dialog::backdrop {
+  background: rgb(12 30 34 / 45%);
+  backdrop-filter: blur(3px);
+}
+
+section[id] {
+  scroll-margin-top: 24px;
+}
