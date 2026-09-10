@@ -22,7 +22,12 @@ export default function Modal({ open, onClose, title, children, footer, classNam
   }, [open])
 
   return createPortal(<dialog ref={dialogRef} aria-labelledby={titleId} aria-modal="true"
-    onCancel={(event) => { event.preventDefault(); onClose() }}
+    onCancel={(event) => {
+      // File inputs also emit cancel; only a cancel on this dialog should close it.
+      if (event.target !== event.currentTarget) return
+      event.preventDefault()
+      onClose()
+    }}
     onKeyDown={(event) => {
       if (event.key !== 'Tab') return
       const elements = [...event.currentTarget.querySelectorAll('a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])')]

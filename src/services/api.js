@@ -1,3 +1,9 @@
+// Backend origin shared by fetch and the Vite development proxy.
+export const API_BASE_URL = 'http://127.0.0.1:8000'
+
+// Keep development requests on the frontend origin for Sanctum cookies.
+export const FETCH_BASE_URL = import.meta.env?.DEV ? '' : API_BASE_URL
+
 export class ApiError extends Error {
   constructor(message, status = 0, retryAt = 0, errors = {}) {
     super(message)
@@ -8,17 +14,18 @@ export class ApiError extends Error {
   }
 }
 
-export async function requestJson(path, { fetcher = fetch, baseUrl = import.meta.env?.VITE_API_BASE_URL || '', method = 'GET', body, csrfToken } = {}) {
+export async function requestJson(path, { fetcher = fetch, baseUrl = FETCH_BASE_URL, method = 'GET', body, csrfToken, timeout = 15000 } = {}) {
+  const multipart = body instanceof FormData
   let response
   try {
     response = await fetcher(`${baseUrl.replace(/\/$/, '')}${path}`, {
       method, credentials: 'include', headers: {
         Accept: 'application/json',
-        ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...(body !== undefined && !multipart ? { 'Content-Type': 'application/json' } : {}),
         ...(csrfToken ? { 'X-XSRF-TOKEN': csrfToken } : {}),
       },
-      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-      signal: AbortSignal.timeout(15000),
+      ...(body !== undefined ? { body: multipart ? body : JSON.stringify(body) } : {}),
+      signal: AbortSignal.timeout(timeout),
     })
   } catch {
     throw new ApiError('Tidak dapat terhubung ke server. Periksa koneksi dan coba lagi.')

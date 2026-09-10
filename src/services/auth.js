@@ -31,14 +31,14 @@ async function csrfRequest(path, body, options = {}) {
 }
 
 export async function login(credentials, options) {
-  await csrfRequest('/login', credentials, options)
+  await csrfRequest('/api/login', credentials, options)
   const user = await fetchSession(options)
   if (!user) throw new ApiError('Sesi login tidak terbaca. Periksa konfigurasi domain Sanctum.', 401)
   return user
 }
 
 export async function logout(options) {
-  try { await csrfRequest('/logout', undefined, options) } catch (error) {
+  try { await csrfRequest('/api/logout', undefined, options) } catch (error) {
     if (error.status !== 401) throw error
   }
 }
