@@ -10,13 +10,14 @@ const types = {
   transfer: { label: 'Transfer', icon: 'arrows', color: 'bg-slate-100 text-slate-600', prefix: '' },
 }
 const walletTypes = { bank: 'Rekening bank', ewallet: 'E-wallet', cash: 'Tunai' }
-export default function DashboardPage() {
+export default function DashboardPage({ user, onLogout, loggingOut, sessionError }) {
   const { data, loading, error, updatedAt, retryIn, refresh } = useDashboard()
   const [selected, setSelected] = useState(null)
   const { wallets = [], incomes = [], expenses = [] } = data || {}
   const transactions = data ? latestTransactions(data) : []
   const transactionTitle = (transaction) => transaction.description || types[transaction.type].label
-  return <DashboardLayout>
+  return <DashboardLayout user={user} onLogout={onLogout} loggingOut={loggingOut}>
+    {user && sessionError && <Alert variant="error" className="mb-5">{sessionError.message}</Alert>}
     <section id="ringkasan" aria-labelledby="dashboard-title">
       <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
         <div><p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-secondary">Ruang keuanganmu</p><h1 id="dashboard-title" className="text-3xl font-semibold tracking-tight sm:text-4xl">Ringkasan keuangan</h1><p className="mt-3 text-sm text-muted">Lihat arus uang dan saldo dompet dalam satu tempat.</p></div>

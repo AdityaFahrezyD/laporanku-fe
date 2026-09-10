@@ -1,5 +1,6 @@
 export { default as Button } from './atoms/Button'
 export { default as Label } from './atoms/Label'
+export { default as Placeholder } from './atoms/Placeholder'
 export { default as Icon } from './atoms/Icon'
 export { default as Card } from './molecules/Card'
 export { default as Alert } from './molecules/Alert'
