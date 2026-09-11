@@ -16,8 +16,8 @@ export default function Sidebar({ items, activeId, onNavigate, open = false, onC
       </a>)}
     </nav>
     <div className="mt-auto pt-12">
-      <div className="rounded-xl border border-white/10 bg-white/5 p-4"><Icon name="leaf" className="mb-3 size-6 text-[#E7B780]" /><p className="text-sm font-medium">Catatan kecil, langkah baik.</p><p className="mt-2 text-xs leading-relaxed text-white/60">Kenali arus keuanganmu, mulai dari hari ini.</p></div>
-      <p className="mt-7 px-2 text-[11px] text-white/45">LaporanKu · Pembukuan bersama</p>
+      <div className="rounded-xl border border-white/10 bg-white/5 p-4"><Icon name="leaf" className="mb-3 size-6 text-[#E7B780]" /><p className="text-sm font-medium">Bismillah.</p><p className="mt-2 text-xs leading-relaxed text-white/60">Pencatatan keuangan (masih manual).</p></div>
+      <p className="mt-7 px-2 text-[11px] text-white/45">LaporanKu · Pembukuan</p>
     </div>
   </div>
   return <>

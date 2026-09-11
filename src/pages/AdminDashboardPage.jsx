@@ -7,6 +7,7 @@ import {
   Modal,
   Placeholder,
 } from "../components";
+import WalletCards from "../components/organisms/WalletCards";
 import RecordEditor from "../components/organisms/RecordEditor";
 import { FETCH_BASE_URL, getJson } from "../services/api";
 import {
@@ -279,6 +280,7 @@ export default function AdminDashboardPage({
           </div>
         )}
       </section>
+      {data && <WalletCards wallets={data.wallets} className="mb-8" />}
       <div
         role="tablist"
         aria-label="Pengelolaan data"

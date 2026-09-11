@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
   Button,
@@ -6,9 +6,13 @@ import {
   DashboardLayout,
   Icon,
   Modal,
+  Placeholder,
 } from "../components";
+import TransactionTable from "../components/organisms/TransactionTable";
+import WalletCards from "../components/organisms/WalletCards";
 import useDashboard from "../hooks/useDashboard";
-import { latestTransactions } from "../services/dashboard";
+import { FETCH_BASE_URL } from "../services/api";
+import { latestTransactions, normalizeTransactions } from "../services/dashboard";
 import { formatDate, formatRupiah, sumAmounts } from "../utils/format";
 
 const types = {
@@ -31,11 +35,19 @@ const types = {
     prefix: "",
   },
 };
-const walletTypes = {
-  bank: "Rekening bank",
-  ewallet: "E-wallet",
-  cash: "Tunai",
+
+const views = {
+  ringkasan: "Ringkasan keuangan",
+  incomes: "Income",
+  expenses: "Expense",
+  transfers: "Transfer",
 };
+const viewTypes = { incomes: "income", expenses: "expense", transfers: "transfer" };
+function currentView() {
+  const hash = window.location.hash.slice(1);
+  return Object.hasOwn(views, hash) ? hash : "ringkasan";
+}
+
 export default function DashboardPage({
   user,
   onLogout,
@@ -45,30 +57,51 @@ export default function DashboardPage({
   const { data, loading, error, updatedAt, retryIn, refresh } = useDashboard();
   const [selected, setSelected] = useState(null);
   const { wallets = [], incomes = [], expenses = [] } = data || {};
-  const transactions = data ? latestTransactions(data) : [];
-  const transactionTitle = (transaction) =>
-    transaction.description || types[transaction.type].label;
+  const [view, setView] = useState(currentView);
+  const [page, setPage] = useState(1);
+  const isSummary = view === "ringkasan";
+  const transactions = data
+    ? isSummary
+      ? latestTransactions(data)
+      : normalizeTransactions(data).filter((row) => row.type === viewTypes[view])
+    : [];
+  const pages = Math.max(1, Math.ceil(transactions.length / 10));
+  const currentPage = Math.min(page, pages);
+  if (page > pages) setPage(pages);
+  const visible = isSummary
+    ? transactions
+    : transactions.slice((currentPage - 1) * 10, currentPage * 10);
+  function navigate(id) {
+    setView(Object.hasOwn(views, id) ? id : "ringkasan");
+    setPage(1);
+    setSelected(null);
+  }
+  useEffect(() => {
+    const onHash = () => navigate(currentView());
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
   return (
-    <DashboardLayout user={user} onLogout={onLogout} loggingOut={loggingOut}>
+    <DashboardLayout user={user} onLogout={onLogout} loggingOut={loggingOut} selectedId={view} onSelect={navigate}>
       {user && sessionError && (
         <Alert variant="error" className="mb-5">
           {sessionError.message}
         </Alert>
       )}
-      <section id="ringkasan" aria-labelledby="dashboard-title">
+      <section id={view} aria-labelledby="dashboard-title">
         <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-secondary">
-              Ruang keuanganmu
+              Pembukuan keuangan
             </p>
             <h1
               id="dashboard-title"
               className="text-3xl font-semibold tracking-tight sm:text-4xl"
             >
-              Ringkasan keuangan
+              {views[view]}
             </h1>
             <p className="mt-3 text-sm text-muted">
-              Lihat arus uang dan saldo dompet dalam satu tempat.
+              {isSummary ? "Lihat arus uang dan saldo dompet." : `Daftar transaksi ${views[view].toLowerCase()} dalam pembukuan ini.`}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -115,7 +148,7 @@ export default function DashboardPage({
             Sedang memuat ringkasan, dompet, dan transaksi…
           </div>
         )}
-        {data && (
+        {data && isSummary && (
           <>
             <div className="grid gap-4 md:grid-cols-3">
               <Card className="relative overflow-hidden !border-primary !bg-primary !text-white">
@@ -163,154 +196,32 @@ export default function DashboardPage({
 
       {data && (
         <>
-          <section
-            id="dompet"
-            aria-labelledby="wallet-heading"
-            className="mt-9"
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <h2 id="wallet-heading" className="text-lg font-semibold">
-                Dompet bersama
-              </h2>
-              <span className="text-xs text-muted">
-                {wallets.filter((wallet) => wallet.is_active).length} aktif ·{" "}
-                {wallets.length} dompet
-              </span>
-            </div>
-            {wallets.length === 0 && (
-              <Card>
-                <p className="text-sm text-muted">
-                  Belum ada dompet dalam pembukuan ini.
-                </p>
-              </Card>
-            )}
-            <div className="grid gap-4 md:grid-cols-3">
-              {wallets.map((wallet) => (
-                <Card key={wallet.wallet_id}>
-                  <div className="flex items-center gap-3">
-                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-base">
-                      <Icon name={wallet.type === "bank" ? "bank" : "wallet"} />
-                    </span>
-                    <div className="min-w-0">
-                      <h3 className="break-words text-sm font-semibold">
-                        {wallet.name}
-                      </h3>
-                      <p className="mt-1 text-xs text-muted">
-                        {walletTypes[wallet.type] || wallet.type}
-                      </p>
-                    </div>
-                    <span
-                      className={`ml-auto shrink-0 rounded-full px-2 py-1 text-[10px] ${wallet.is_active
-                          ? "bg-primary/8 text-primary"
-                          : "bg-base text-muted"
-                        }`}
-                    >
-                      {wallet.is_active ? "Aktif" : "Nonaktif"}
-                    </span>
-                  </div>
-                  <p className="mt-6 text-xs text-muted">Saldo tersedia</p>
-                  <p className="mt-1 text-xl font-semibold tracking-tight tabular-nums">
-                    {formatRupiah(wallet.balance)}
-                  </p>
-                </Card>
-              ))}
-            </div>
-          </section>
-
-          <section
-            id="transaksi"
-            aria-labelledby="transactions-heading"
-            className="mt-9"
-          >
+          {isSummary && <WalletCards wallets={wallets} />}
+          <section aria-labelledby="transactions-heading" className={isSummary ? "mt-9" : ""}>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <h2 id="transactions-heading" className="text-lg font-semibold">
-                Transaksi terbaru
+                {isSummary ? "Transaksi terbaru" : "Daftar transaksi"}
               </h2>
               <span className="text-xs text-muted">
-                {transactions.length} transaksi terakhir
+                {transactions.length} {isSummary ? "transaksi terakhir" : "transaksi"}
               </span>
             </div>
-            <Card className="!p-0 overflow-hidden">
-              {transactions.length === 0 && (
-                <p className="p-6 text-sm text-muted">
-                  Belum ada transaksi dalam pembukuan ini.
-                </p>
-              )}
-              <div className="hidden grid-cols-[minmax(0,1.6fr)_1fr_1fr_1fr_72px] gap-4 border-b border-primary/10 bg-primary/[0.025] px-6 py-3.5 text-[11px] font-medium uppercase tracking-wider text-muted xl:grid">
-                <span>Transaksi</span>
-                <span>Dompet</span>
-                <span>Tanggal</span>
-                <span className="text-right">Nominal</span>
-                <span className="text-right">Detail</span>
-              </div>
-              <ul className="divide-y divide-primary/8">
-                {transactions.map((transaction) => (
-                  <li
-                    key={transaction.id}
-                    className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-5 sm:px-6 xl:grid-cols-[minmax(0,1.6fr)_1fr_1fr_1fr_72px] xl:gap-4"
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <span
-                        className={`hidden size-10 shrink-0 items-center justify-center rounded-xl sm:flex ${types[transaction.type].color
-                          }`}
-                      >
-                        <Icon name={types[transaction.type].icon} />
-                      </span>
-                      <div className="min-w-0">
-                        <p className="break-words text-sm font-medium">
-                          {transactionTitle(transaction)}
-                        </p>
-                        <p className="mt-1 break-words text-xs text-muted">
-                          {transaction.category?.name ||
-                            (transaction.type === "transfer"
-                              ? "Antardompet"
-                              : "Tanpa kategori")}{" "}
-                          <span className="xl:hidden">
-                            · {formatDate(transaction.transaction_date)}
-                          </span>
-                        </p>
-                      </div>
-                    </div>
-                    <p className="hidden break-words text-xs leading-relaxed text-muted xl:block">
-                      {transaction.walletName}
-                    </p>
-                    <p className="hidden text-xs text-muted xl:block">
-                      {formatDate(transaction.transaction_date)}
-                    </p>
-                    <p
-                      className={`text-right text-sm font-semibold tabular-nums ${transaction.type === "expense"
-                          ? "text-secondary"
-                          : "text-primary"
-                        }`}
-                    >
-                      <span className="sr-only">
-                        {types[transaction.type].label}:{" "}
-                      </span>
-                      {types[transaction.type].prefix}
-                      {formatRupiah(transaction.amount)}
-                    </p>
-                    <div className="col-span-2 flex min-w-0 items-center justify-between gap-2 xl:col-span-1 xl:justify-end">
-                      <span className="min-w-0 break-words text-xs text-muted xl:hidden">
-                        {transaction.walletName}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        aria-label={`Detail ${transactionTitle(transaction)}`}
-                        onClick={() => setSelected(transaction)}
-                      >
-                        Detail
-                        <Icon name="chevron" className="size-3" />
-                      </Button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-              <div className="border-t border-primary/8 px-6 py-3 text-xs text-muted">
-                Waktu ditampilkan dalam WIB · Transfer memindahkan saldo
-                antardompet.
-              </div>
-            </Card>
+            <TransactionTable
+              transactions={visible}
+              types={types}
+              onDetail={setSelected}
+              title={isSummary ? "Transaksi terbaru" : views[view]}
+              emptyMessage={isSummary ? "Belum ada transaksi dalam pembukuan ini." : `Belum ada transaksi ${views[view].toLowerCase()} dalam pembukuan ini.`}
+            />
+            {!isSummary && (
+              <nav aria-label="Paginasi transaksi" className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-xs text-muted">Halaman {currentPage} dari {pages}</p>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>Sebelumnya</Button>
+                  <Button variant="outline" size="sm" disabled={currentPage === pages} onClick={() => setPage(currentPage + 1)}>Berikutnya</Button>
+                </div>
+              </nav>
+            )}
           </section>
         </>
       )}
@@ -356,8 +267,38 @@ export default function DashboardPage({
                 </div>
               ))}
             </dl>
+            <section className="mt-6 border-t border-primary/10 pt-4" aria-labelledby="guest-attachments-heading">
+              <h3 id="guest-attachments-heading" className="mb-3 font-semibold">Bukti transaksi</h3>
+              {!selected.attachments?.length && (
+                <p className="text-sm text-muted">Belum ada attachment.</p>
+              )}
+              <div className="grid gap-3">
+                {selected.attachments?.map((attachment, index) => (
+                  attachment.url ? (
+                    <a
+                      key={attachment.attachment_id}
+                      href={FETCH_BASE_URL + attachment.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={`Buka gambar ${index + 1} ukuran penuh`}
+                    >
+                      <Placeholder
+                        src={FETCH_BASE_URL + attachment.url}
+                        alt={`Bukti transaksi ${index + 1}`}
+                        imageClassName="!object-contain"
+                        description="Klik untuk membuka gambar ukuran penuh."
+                      />
+                    </a>
+                  ) : (
+                    <p key={attachment.attachment_id} className="text-xs text-muted">
+                      Gambar lama belum tersedia.
+                    </p>
+                  )
+                ))}
+              </div>
+            </section>
             <p className="mt-6 border-t border-primary/10 pt-4 text-xs text-muted">
-              Pembukuan bersama · Detail ini hanya untuk dibaca.
+              Detail ini hanya untuk dibaca.
             </p>
           </>
         )}

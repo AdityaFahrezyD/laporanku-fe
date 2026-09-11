@@ -1,12 +1,25 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { getJson } from '../src/services/api.js'
-import { fetchDashboard, latestTransactions } from '../src/services/dashboard.js'
+import { fetchDashboard, latestTransactions, normalizeTransactions } from '../src/services/dashboard.js'
 import { wallets, incomes, expenses, transfers } from '../src/data/dashboardMock.js'
 import { formatDate, formatRupiah, sumAmounts } from '../src/utils/format.js'
 
 const fixture = { wallets, incomes, expenses, transfers }
 const json = (data) => new Response(JSON.stringify({ message: 'OK', data }), { status: 200 })
+
+test('normalization keeps every transaction while latest selects five globally', () => {
+  const data = {
+    incomes: Array.from({ length: 11 }, (_, i) => ({ income_id: `i${i}`, amount: '10.00', transaction_date: `2026-09-${String(i + 1).padStart(2, '0')}T00:00:00Z` })),
+    expenses: [{ expense_id: 'e1', amount: '2.00', transaction_date: '2026-09-12T00:00:00Z' }],
+    transfers: [{ transfer_id: 't1', amount: '1.00', transaction_date: '2026-09-13T00:00:00Z' }],
+  }
+  assert.equal(normalizeTransactions(data).length, 13)
+  assert.deepEqual(latestTransactions(data).map(row => row.id), ['t1', 'e1', 'i10', 'i9', 'i8'])
+  assert.deepEqual(latestTransactions({ incomes: data.incomes }).map(row => row.id), ['i10', 'i9', 'i8', 'i7', 'i6'])
+  assert.equal(data.incomes[0].income_id, 'i0')
+  assert.deepEqual(normalizeTransactions({}), [])
+})
 
 test('reads four public resources with cookies and the Laravel envelope', async () => {
   const requests = []

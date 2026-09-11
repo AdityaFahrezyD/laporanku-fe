@@ -5,8 +5,9 @@ import Sidebar from "../organisms/Sidebar";
 
 const items = [
   { id: "ringkasan", label: "Ringkasan", icon: "grid" },
-  { id: "dompet", label: "Dompet", icon: "wallet" },
-  { id: "transaksi", label: "Transaksi", icon: "arrows" },
+  { id: "incomes", label: "Income", icon: "down" },
+  { id: "expenses", label: "Expense", icon: "up" },
+  { id: "transfers", label: "Transfer", icon: "arrows" },
 ];
 
 export default function DashboardLayout({
@@ -84,7 +85,7 @@ export default function DashboardLayout({
       </main>
       <footer className="mx-5 flex flex-wrap justify-between gap-2 border-t border-primary/10 py-6 text-xs text-muted sm:mx-8 lg:mx-10">
         <span>© 2026 LaporanKu</span>
-        <span>Lebih teratur, lebih tenang.</span>
+        <span>IQ + ketenangan.</span>
       </footer>
     </div>
   );

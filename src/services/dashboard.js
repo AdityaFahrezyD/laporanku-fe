@@ -35,10 +35,14 @@ export function loadDashboard() {
   return pendingRequest
 }
 
-export function latestTransactions({ incomes, expenses, transfers }) {
+export function normalizeTransactions({ incomes = [], expenses = [], transfers = [] }) {
   return [
     ...incomes.map((item) => ({ ...item, id: item.income_id, type: 'income', walletName: item.income_wallet?.name || 'Dompet tidak tersedia' })),
     ...expenses.map((item) => ({ ...item, id: item.expense_id, type: 'expense', walletName: item.expense_wallet?.name || 'Dompet tidak tersedia' })),
     ...transfers.map((item) => ({ ...item, id: item.transfer_id, type: 'transfer', walletName: `${item.transfer_from?.name || 'Dompet tidak tersedia'} → ${item.transfer_to?.name || 'Dompet tidak tersedia'}` })),
-  ].sort((a, b) => Date.parse(b.transaction_date) - Date.parse(a.transaction_date) || a.id.localeCompare(b.id)).slice(0, 5)
+  ].sort((a, b) => Date.parse(b.transaction_date) - Date.parse(a.transaction_date) || a.id.localeCompare(b.id))
+}
+
+export function latestTransactions(data) {
+  return normalizeTransactions(data).slice(0, 5)
 }

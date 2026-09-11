@@ -1,0 +1,161 @@
+import { test, expect } from '@playwright/test'
+
+const labels = { incomes: 'Income', expenses: 'Expense', transfers: 'Transfer' }
+const keys = { incomes: 'income_id', expenses: 'expense_id', transfers: 'transfer_id' }
+const wallet = { wallet_id: 'w1', name: 'Bank Utama', type: 'bank', balance: '1000.00', is_active: true }
+function records(resource, count) {
+  return Array.from({ length: count }, (_, i) => ({
+    [keys[resource]]: `${resource}-${i}`, description: `${labels[resource]} ${i}`, amount: '10.00',
+    transaction_date: `2026-09-${String(i + 1).padStart(2, '0')}T03:00:00Z`,
+    income_wallet: wallet, expense_wallet: wallet, transfer_from: wallet, transfer_to: { ...wallet, name: 'Tunai' },
+  }))
+}
+async function setup(page, hash = '', count = 11) {
+  const db = { wallets: [wallet], ...Object.fromEntries(Object.keys(labels).map(resource => [resource, records(resource, count)])) }
+  const state = { fail: false }
+  await page.route('**/api/**', route => {
+    if (route.request().url().includes('/attachments/')) return route.fallback()
+    const resource = new URL(route.request().url()).pathname.split('/').pop()
+    return route.fulfill({ status: resource === 'user' ? 401 : state.fail ? 429 : 200,
+      headers: state.fail ? { 'Retry-After': '60' } : {}, contentType: 'application/json', body: JSON.stringify({ data: db[resource] || [] }) })
+  })
+  await page.goto('/' + hash)
+  await expect(page.getByRole('table')).toHaveCount(1)
+  return { db, state }
+}
+async function navigate(page, name) {
+  await page.getByRole('navigation', { name: 'Navigasi utama' }).getByRole('link', { name, exact: true }).click()
+}
+
+for (const view of ['ringkasan', 'incomes', 'expenses', 'transfers']) {
+  test(`${view} detail shows all attachments and opens full images`, async ({ page }) => {
+    const { db } = await setup(page, '#' + view, 1)
+    const resource = view === 'ringkasan' ? 'incomes' : view
+    const attachmentUrl = (id) => `/api/${resource}/${resource}-0/attachments/${id}`
+    db[resource][0].attachments = [1, 2].map(id => ({ attachment_id: `a${id}`, url: attachmentUrl(id) }))
+    await page.context().route('**/attachments/*', route => route.fulfill({
+      contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><rect width="20" height="20" fill="green"/></svg>',
+    }))
+    await page.getByRole('button', { name: 'Muat ulang', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Muat ulang', exact: true })).toBeEnabled()
+    await page.getByRole('button', { name: `Detail ${labels[resource]} 0`, exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: 'Detail transaksi' })
+    await expect(dialog.getByRole('heading', { name: 'Bukti transaksi' })).toBeVisible()
+    await expect(dialog.getByRole('img')).toHaveCount(2)
+    for (const id of [1, 2]) {
+      const img = dialog.getByRole('img', { name: `Bukti transaksi ${id}`, exact: true })
+      await img.scrollIntoViewIfNeeded()
+      await expect.poll(() => img.evaluate(node => node.complete && node.naturalWidth > 0)).toBe(true)
+      await expect(dialog.getByRole('link', { name: `Buka gambar ${id} ukuran penuh` })).toHaveAttribute('href', attachmentUrl(id))
+    }
+    const popupPromise = page.waitForEvent('popup')
+    await dialog.getByRole('link', { name: 'Buka gambar 2 ukuran penuh' }).click()
+    const popup = await popupPromise
+    await expect(popup).toHaveURL(new RegExp(attachmentUrl(2) + '$'))
+    await popup.close()
+    await expect(dialog.locator('input[type=file]')).toHaveCount(0)
+    await expect(dialog.getByRole('button', { name: /Upload|Hapus|Simpan/ })).toHaveCount(0)
+    await page.setViewportSize({ width: 390, height: 600 })
+    await dialog.getByRole('link', { name: 'Buka gambar 2 ukuran penuh' }).scrollIntoViewIfNeeded()
+    expect(await dialog.evaluate(node => node.scrollHeight > node.clientHeight && node.scrollTop > 0)).toBe(true)
+    await dialog.getByRole('button', { name: 'Tutup', exact: true }).click()
+    await expect(dialog).toHaveCount(0)
+  })
+}
+
+test('attachment detail handles empty lists, legacy URLs and failed images', async ({ page }) => {
+  const { db } = await setup(page, '#incomes', 1)
+  await page.getByRole('button', { name: 'Detail Income 0', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Detail transaksi' })
+  await expect(dialog.getByText('Belum ada attachment.')).toBeVisible()
+  await dialog.getByRole('button', { name: 'Tutup', exact: true }).click()
+  db.incomes[0].attachments = [
+    { attachment_id: 'legacy', url: null },
+    { attachment_id: 'missing', url: '/api/incomes/incomes-0/attachments/missing' },
+  ]
+  await page.route('**/attachments/missing', route => route.fulfill({ status: 404 }))
+  await page.getByRole('button', { name: 'Muat ulang', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Muat ulang', exact: true })).toBeEnabled()
+  await page.getByRole('button', { name: 'Detail Income 0', exact: true }).click()
+  await expect(dialog.getByText('Gambar lama belum tersedia.')).toBeVisible()
+  await dialog.getByRole('link', { name: 'Buka gambar 2 ukuran penuh' }).scrollIntoViewIfNeeded()
+  await expect(dialog.getByText('Gambar tidak dapat dimuat')).toBeVisible()
+  await expect(dialog.getByRole('link')).toHaveCount(1)
+})
+
+test('summary shows one globally sorted table and retains wallet cards', async ({ page }) => {
+  const { db } = await setup(page)
+  await expect(page.getByRole('heading', { name: 'Dompet', exact: true })).toBeVisible()
+  await expect(page.getByRole('table', { name: 'Transaksi terbaru' }).locator('tbody tr')).toHaveCount(5)
+  const names = await page.locator('tbody tr td:first-child .font-medium').allTextContents()
+  expect(names).toEqual(['Expense 10', 'Income 10', 'Transfer 10', 'Expense 9', 'Income 9'])
+  await expect(page.getByRole('navigation', { name: 'Paginasi transaksi' })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Dompet', exact: true })).toHaveCount(0)
+  db.expenses = []; db.transfers = []
+  await page.getByRole('button', { name: 'Muat ulang', exact: true }).click()
+  await expect(page.locator('tbody tr td:first-child .font-medium')).toHaveText(['Income 10', 'Income 9', 'Income 8', 'Income 7', 'Income 6'])
+})
+
+for (const [resource, label] of Object.entries(labels)) {
+  test(`${label} isolates its records and paginates 0, 10 and 11 rows`, async ({ page }) => {
+    const { db } = await setup(page, '#' + resource)
+    await expect(page.getByRole('heading', { name: label, exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Dompet', exact: true })).toHaveCount(0)
+    await expect(page.getByText('Total saldo', { exact: true })).toHaveCount(0)
+    const rows = page.getByRole('table', { name: label, exact: true }).locator('tbody tr')
+    await expect(rows).toHaveCount(10)
+    for (const name of await rows.locator('td:first-child .font-medium').allTextContents()) expect(name).toMatch(new RegExp('^' + label + ' '))
+    await expect(page.getByRole('button', { name: 'Sebelumnya' })).toBeDisabled()
+    await page.getByRole('button', { name: 'Berikutnya' }).click()
+    await expect(rows).toHaveCount(1)
+    await expect(page.getByText('Halaman 2 dari 2')).toBeVisible()
+    await page.getByRole('button', { name: `Detail ${label} 0`, exact: true }).click()
+    await expect(page.getByRole('dialog').getByText(`${resource}-0`, { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Tutup', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Berikutnya' })).toBeDisabled()
+    db[resource] = records(resource, 10)
+    await page.getByRole('button', { name: 'Muat ulang', exact: true }).click()
+    await expect(rows).toHaveCount(10)
+    await expect(page.getByText('Halaman 1 dari 1')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Berikutnya' })).toBeDisabled()
+    db[resource] = []
+    await page.getByRole('button', { name: 'Muat ulang', exact: true }).click()
+    await expect(rows).toHaveCount(0)
+    await expect(page.getByText(`Belum ada transaksi ${label.toLowerCase()} dalam pembukuan ini.`)).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Sebelumnya' })).toBeDisabled()
+  })
+}
+
+test('navigation resets pagination and supports history, reload and mobile', async ({ page }) => {
+  await setup(page, '#incomes')
+  await page.getByRole('button', { name: 'Berikutnya' }).click()
+  await navigate(page, 'Expense')
+  await expect(page.getByText('Halaman 1 dari 2')).toBeVisible()
+  await page.goBack()
+  await expect(page.getByRole('table', { name: 'Income', exact: true })).toBeVisible()
+  await expect(page.getByText('Halaman 1 dari 2')).toBeVisible()
+  await page.goForward()
+  await expect(page.getByRole('table', { name: 'Expense', exact: true })).toBeVisible()
+  await page.reload()
+  await expect(page.getByRole('table', { name: 'Expense', exact: true })).toBeVisible()
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.getByRole('button', { name: 'Buka menu navigasi' }).click()
+  await page.getByRole('dialog', { name: 'Menu navigasi' }).getByRole('link', { name: 'Transfer', exact: true }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page.getByRole('table', { name: 'Transfer', exact: true })).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+})
+
+test('unknown hash falls back to summary and cooldown keeps data on transaction views', async ({ page }) => {
+  const { state } = await setup(page, '#unknown')
+  await expect(page.getByRole('heading', { name: 'Ringkasan keuangan' })).toBeVisible()
+  await navigate(page, 'Income')
+  state.fail = true
+  await page.getByRole('button', { name: 'Muat ulang', exact: true }).click()
+  await expect(page.getByRole('alert')).toContainText('HTTP 429')
+  await expect(page.getByRole('button', { name: /Tunggu \d+ detik/ })).toBeDisabled()
+  await expect(page.locator('tbody tr')).toHaveCount(10)
+  await navigate(page, 'Transfer')
+  await expect(page.getByRole('alert')).toBeVisible()
+  await expect(page.getByRole('button', { name: /Tunggu \d+ detik/ })).toBeDisabled()
+})
