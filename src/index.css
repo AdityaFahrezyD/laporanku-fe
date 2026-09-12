@@ -18,9 +18,29 @@
   -webkit-font-smoothing: antialiased;
 }
 
+html,
+body {
+  overflow-x: clip;
+}
+
 body {
   margin: 0;
   min-width: 320px;
+}
+
+#root {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Contain wide columns and absolutely positioned screen-reader text inside the table. */
+.table-scroll {
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
 }
 
 button,

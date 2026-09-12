@@ -15,7 +15,7 @@ export default function WalletCards({ wallets = [], className = "mt-9" }) {
       aria-labelledby="wallet-heading"
       className={className}
     >
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h2 id="wallet-heading" className="text-lg font-semibold">
           Dompet
         </h2>

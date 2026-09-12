@@ -284,7 +284,7 @@ export default function AdminDashboardPage({
       <div
         role="tablist"
         aria-label="Pengelolaan data"
-        className="mb-5 flex gap-2 overflow-x-auto border-b border-primary/10 pb-3"
+        className="mb-5 flex min-w-0 flex-wrap gap-2 border-b border-primary/10 pb-3"
       >
         {resources.map((r, index) => (
           <button
@@ -338,7 +338,7 @@ export default function AdminDashboardPage({
               {error && data ? " · data terakhir, mungkin belum terbaru" : ""}
             </p>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex min-w-0 max-w-full flex-wrap gap-3">
             <input
               aria-label={"Cari " + meta.label}
               placeholder={"Cari " + meta.singular + "…"}
@@ -347,7 +347,7 @@ export default function AdminDashboardPage({
                 setQuery(e.target.value);
                 setPage(1);
               }}
-              className="rounded-xl border border-primary/15 bg-white px-4 py-2 text-sm"
+              className="min-w-0 max-w-full rounded-xl border border-primary/15 bg-white px-4 py-2 text-sm"
             />
             <Button
               disabled={!data || loading || blocked || busy}
@@ -372,7 +372,7 @@ export default function AdminDashboardPage({
           </p>
         )}
         <Card className="!p-0 overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="table-scroll">
             <table className="w-full text-left text-sm">
               <thead className="bg-primary/5 text-xs text-muted">
                 <tr>
@@ -459,7 +459,7 @@ export default function AdminDashboardPage({
                 : "Belum ada data. Mulai dengan tombol tambah."}
             </p>
           )}
-          <div className="flex items-center justify-between border-t border-primary/10 p-4 text-xs text-muted">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-primary/10 p-4 text-xs text-muted">
             <span>
               Halaman {currentPage} dari {pages}
             </span>

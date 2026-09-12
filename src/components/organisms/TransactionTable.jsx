@@ -6,7 +6,7 @@ import { formatDate, formatRupiah } from "../../utils/format";
 export default function TransactionTable({ transactions, types, onDetail, title, emptyMessage }) {
   return (
     <Card className="!p-0 overflow-hidden">
-      <div className="overflow-x-auto">
+      <div className="table-scroll">
         <table aria-label={title} className="w-full text-left text-sm">
           <thead className="bg-primary/5 text-xs text-muted">
             <tr>

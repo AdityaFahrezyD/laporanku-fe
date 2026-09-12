@@ -37,6 +37,11 @@ posisi scroll dan fokus. Sidebar desktop memakai susunan yang sama, sementara
 dashboard tetap dapat digulir sendiri. Notifikasi offline dan pembaruan tetap
 terpisah dari tombol pemasangan.
 
+Halaman mengikuti lebar layar dan hanya digulir vertikal; geser horizontal
+tersedia di dalam tabel untuk menjangkau seluruh kolom. Pada HP, header
+menampilkan Dashboard beserta kontrol akun, dan tab admin tersusun beberapa
+baris. Nama panjang dan nominal besar membungkus di dalam kartu.
+
 Service worker hanya menyimpan aset statis build, manifest, ikon, dan halaman
 offline. Dokumen navigasi diminta dari jaringan; kegagalan koneksi menampilkan
 halaman offline dengan tombol **Coba lagi**. API, sesi, CSRF, bukti transaksi,

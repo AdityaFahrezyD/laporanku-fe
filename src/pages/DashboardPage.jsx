@@ -38,8 +38,8 @@ const types = {
 
 const views = {
   ringkasan: "Ringkasan keuangan",
-  incomes: "Income",
-  expenses: "Expense",
+  incomes: "Pemasukan",
+  expenses: "Pengeluaran",
   transfers: "Transfer",
 };
 const viewTypes = { incomes: "income", expenses: "expense", transfers: "transfer" };
