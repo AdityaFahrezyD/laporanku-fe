@@ -1,6 +1,7 @@
 import { cloneElement, useId, useState } from 'react'
 import { Alert, Button, Modal, Placeholder } from '../index'
 import AttachmentPicker from './AttachmentPicker'
+import MoneyInput from '../atoms/MoneyInput'
 import { FETCH_BASE_URL } from '../../services/api'
 import { dateInput, isTransaction, mutate, payload, resources, saveRecord, uploadAttachment } from '../../services/admin'
 
@@ -81,12 +82,12 @@ export default function RecordEditor({ resource, record, data, onClose, onChange
         <Field label="Nama" name="name" errors={error?.errors}><input {...props('name')} required maxLength={resource === 'wallets' ? 50 : 100} /></Field>
         <Field label="Jenis" name="type" errors={error?.errors}><select {...props('type')}>{(resource === 'wallets' ? [['bank', 'Rekening bank'], ['cash', 'Tunai'], ['ewallet', 'E-wallet']] : [['income', 'Income'], ['expense', 'Expenses']]).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
         {resource === 'wallets' && <>
-          {!record ? <Field label="Saldo awal (Rp)" name="balance" errors={error?.errors}><input {...props('balance')} type="number" min="0" max="9999999999999.99" step="0.01" required /></Field> : <p className="text-sm text-muted">Saldo berubah melalui transaksi. Dompet dapat dinonaktifkan, tanpa menghapus riwayatnya.</p>}
+          {!record ? <Field label="Saldo awal (Rp)" name="balance" errors={error?.errors}><MoneyInput {...props('balance')} onValueChange={(value) => change('balance', value)} min="0" required /></Field> : <p className="text-sm text-muted">Saldo berubah melalui transaksi. Dompet dapat dinonaktifkan, tanpa menghapus riwayatnya.</p>}
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={values.is_active} disabled={locked} onChange={(e) => change('is_active', e.target.checked)} />Dompet aktif</label>
         </>}
       </> : <>
         <div className="grid gap-5 sm:grid-cols-2">{resource === 'transfers' ? <>{walletField('from_wallet_id', 'Dompet asal')}{walletField('to_wallet_id', 'Dompet tujuan')}</> : walletField('wallet_id', 'Dompet')}
-          <Field label="Nominal (Rp)" name="amount" errors={error?.errors}><input {...props('amount')} type="number" min="0.01" max="9999999999999.99" step="0.01" required /></Field>
+          <Field label="Nominal (Rp)" name="amount" errors={error?.errors}><MoneyInput {...props('amount')} onValueChange={(value) => change('amount', value)} min="0.01" required /></Field>
           <Field label="Tanggal dan waktu (WIB)" name="transaction_date" errors={error?.errors}><input {...props('transaction_date')} type="datetime-local" required /></Field>
           {resource !== 'transfers' && <Field label="Kategori (opsional)" name="category_id" errors={error?.errors}><select {...props('category_id')}><option value="">Tanpa kategori</option>{data.categories.filter((category) => category.type === meta.singular).map((category) => <option key={category.category_id} value={category.category_id}>{category.name}</option>)}</select></Field>}
         </div>
