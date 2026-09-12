@@ -228,7 +228,7 @@ export default function AdminDashboardPage({
                 <p key={i}>{message}</p>
               ))}
             {[401, 419].includes((sessionError || error).status) && (
-              <a className="mt-2 block underline" href="/api/login">
+              <a className="mt-2 block underline" href="/admin">
                 Buka halaman login
               </a>
             )}

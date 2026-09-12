@@ -3,6 +3,7 @@ import DashboardPage from './pages/DashboardPage'
 import AdminDashboardPage from './pages/AdminDashboardPage'
 import LoginPage from './pages/LoginPage'
 import { loadSession, logout } from './services/auth'
+import PwaControls from './components/organisms/PwaControls'
 
 export default function App() {
   const [user, setUser] = useState(null)
@@ -29,9 +30,12 @@ export default function App() {
     } catch (error) { setSessionError(error) } finally { setLoggingOut(false) }
   }
 
-  if (window.location.pathname.replace(/\/$/, '') === '/api/login') {
-    return <LoginPage user={user} checking={checking} sessionError={sessionError} onAuthenticated={(account) => { setUser(account); setSessionError(null) }} onLogout={handleLogout} />
-  }
-  if (user?.role === 'admin') return <AdminDashboardPage user={user} onLogout={handleLogout} loggingOut={loggingOut} sessionError={sessionError} />
-  return <DashboardPage user={user} onLogout={handleLogout} loggingOut={loggingOut} sessionError={sessionError} />
+  return <>
+    {window.location.pathname.replace(/\/$/, '') === '/admin'
+      ? <LoginPage user={user} checking={checking} sessionError={sessionError} onAuthenticated={(account) => { setUser(account); setSessionError(null) }} onLogout={handleLogout} />
+      : user?.role === 'admin'
+        ? <AdminDashboardPage user={user} onLogout={handleLogout} loggingOut={loggingOut} sessionError={sessionError} />
+        : <DashboardPage user={user} onLogout={handleLogout} loggingOut={loggingOut} sessionError={sessionError} />}
+    <PwaControls />
+  </>
 }

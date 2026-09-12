@@ -25,18 +25,20 @@ test('login page navigation serves the SPA while API methods reach the backend',
     })
     await vite.listen()
     const origin = 'http://127.0.0.1:' + vite.httpServer.address().port
-    for (const path of ['/api/login', '/api/login/', '/api/login?next=dashboard', '/api/login/?next=dashboard', '/login']) {
-      const response = await fetch(origin + path)
+    for (const path of ['/admin', '/admin/', '/api/login', '/api/login/', '/api/login?next=dashboard', '/api/login/?next=dashboard', '/login']) {
+      const response = await fetch(origin + path, { headers: { Accept: 'text/html' } })
       assert.equal(response.status, 200)
       assert.match(response.headers.get('content-type'), /text\/html/)
       assert.match(await response.text(), /src\/main.jsx/)
     }
-    const head = await fetch(origin + '/api/login/?next=dashboard', { method: 'HEAD' })
+    const head = await fetch(origin + '/api/login/?next=dashboard', { method: 'HEAD', headers: { Accept: 'text/html' } })
     assert.equal(head.status, 200)
     assert.match(head.headers.get('content-type'), /text\/html/)
     assert.deepEqual(requests, [])
     for (const [method, path] of [
       ['POST', '/api/login'],
+      ['GET', '/api/login'],
+      ['HEAD', '/api/login'],
       ['POST', '/api/logout'],
       ['GET', '/api/user'],
       ['GET', '/api/wallets'],
@@ -45,7 +47,7 @@ test('login page navigation serves the SPA while API methods reach the backend',
       ['GET', '/sanctum/csrf-cookie'],
     ]) {
       const response = await fetch(origin + path, { method })
-      assert.deepEqual(await response.json(), { backend: true })
+      if (method !== 'HEAD') assert.deepEqual(await response.json(), { backend: true })
       assert.deepEqual(requests.at(-1), [method, path])
     }
   } finally {
