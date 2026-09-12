@@ -1,5 +1,5 @@
 // Backend origin shared by fetch and the Vite development proxy.
-export const API_BASE_URL = 'http://127.0.0.1:8000'
+export const API_BASE_URL = 'https://laporanku.my.id'
 
 // Keep development requests on the frontend origin for Sanctum cookies.
 export const FETCH_BASE_URL = import.meta.env?.DEV ? '' : API_BASE_URL

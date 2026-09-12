@@ -44,7 +44,10 @@ Pemuatan awal dan tombol Muat ulang meminta empat daftar. Tidak ada polling atau
 
 ## Deployment
 
-Proxy `server.proxy` hanya berlaku pada Vite dev server. Untuk build produksi, arahkan `/api`, `/sanctum`, POST `/api/login`, dan POST `/api/logout` ke backend pada origin yang sama; GET/HEAD `/api/login` dan `/api/login/` harus dilayani SPA dengan fallback ke `index.html`, termasuk ketika memakai query string. Terapkan pengecualian ini sebelum aturan proxy umum `/api`; POST pada path yang sama tetap menuju backend. URL lama `/login` juga harus dilayani SPA agar pengalihan frontend berjalan. Build produksi memakai `API_BASE_URL` secara langsung untuk fetch. Sebelum deployment, ganti konstanta tersebut ke origin backend produksi; gunakan string kosong jika memakai reverse proxy pada origin yang sama. Alamat `127.0.0.1` hanya untuk penggunaan lokal. Pada opsi lintas origin, frontend/backend harus memakai domain induk yang sama dengan konfigurasi session domain, stateful Sanctum, dan CORS credentials yang sesuai agar cookie XSRF terbaca oleh frontend. Agar hitungan mundur 429 persis mengikuti header server, expose `Retry-After`; jika tidak terbaca, frontend menunggu 60 detik.
+Frontend produksi memakai Vercel di `https://adit.laporanku.my.id`, dengan backend
+`https://laporanku.my.id`. Konfigurasi build dan fallback SPA tersedia di
+`vercel.json`. Ikuti [panduan deployment](DEPLOYMENT.md) untuk DNS, konfigurasi
+cookie Sanctum pada hosting, dan pemeriksaan login setelah deploy.
 
 ## Kendala backend yang ditemukan
 
