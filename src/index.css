@@ -60,6 +60,20 @@ body {
   overflow-wrap: anywhere;
 }
 
+/* Keep the original amount column visible until scrolling reaches its natural position. */
+.table-amount {
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  background: white;
+  box-shadow: -1px 0 0 #1f444c1a;
+}
+
+thead .table-amount {
+  z-index: 2;
+  background: color-mix(in srgb, var(--color-primary) 5%, white);
+}
+
 button,
 a {
   -webkit-tap-highlight-color: transparent;

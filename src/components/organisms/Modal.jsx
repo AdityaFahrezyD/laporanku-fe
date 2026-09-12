@@ -3,8 +3,14 @@ import { createPortal } from 'react-dom'
 import Button from '../atoms/Button'
 import Icon from '../atoms/Icon'
 
+function isOutsidePanel(event) {
+  const bounds = event.currentTarget.getBoundingClientRect()
+  return event.clientX < bounds.left || event.clientX >= bounds.right || event.clientY < bounds.top || event.clientY >= bounds.bottom
+}
+
 export default function Modal({ open, onClose, title, children, footer, className = '', variant = 'modal' }) {
   const dialogRef = useRef(null)
+  const backdropPress = useRef(null)
   const titleId = useId()
   const drawer = variant === 'drawer'
 
@@ -25,6 +31,7 @@ export default function Modal({ open, onClose, title, children, footer, classNam
     }
     dialog.showModal()
     return () => {
+      backdropPress.current = null
       dialog.close()
       document.body.style.overflow = previousOverflow
       if (drawer) {
@@ -37,6 +44,22 @@ export default function Modal({ open, onClose, title, children, footer, classNam
   }, [open, drawer])
 
   return createPortal(<dialog ref={dialogRef} aria-labelledby={titleId} aria-modal="true"
+    onPointerDown={(event) => {
+      backdropPress.current = drawer && event.isPrimary && event.button === 0 && isOutsidePanel(event)
+        ? { x: event.clientX, y: event.clientY } : null
+    }}
+    onPointerMove={(event) => {
+      const start = backdropPress.current
+      if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 10) backdropPress.current = null
+    }}
+    onPointerCancel={() => { backdropPress.current = null }}
+    onClick={(event) => {
+      const start = backdropPress.current
+      backdropPress.current = null
+      // Native dialog backdrop clicks target the dialog itself; check coordinates too.
+      // Close on a completed tap, never a drag that started inside the panel.
+      if (drawer && start && isOutsidePanel(event) && Math.hypot(event.clientX - start.x, event.clientY - start.y) <= 10) onClose()
+    }}
     onCancel={(event) => {
       // File inputs also emit cancel; only a cancel on this dialog should close it.
       if (event.target !== event.currentTarget) return

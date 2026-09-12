@@ -1,6 +1,42 @@
 import { test, expect } from '@playwright/test'
 import * as mock from '../../src/data/dashboardMock.js'
 
+async function checkStickyAmount(table) {
+  const scroller = table.locator('..')
+  const header = table.locator('thead .table-amount')
+  const amount = table.locator('tbody tr').first().locator('.table-amount')
+  await expect(header).toHaveCount(1)
+  await expect(amount).toHaveCount(1)
+  const geometry = await header.evaluate((el) => {
+    const area = el.closest('.table-scroll')
+    area.scrollLeft = 0
+    el.style.position = 'static'
+    const naturalRight = el.getBoundingClientRect().right
+    el.style.removeProperty('position')
+    return { naturalRight, edge: area.getBoundingClientRect().right, max: area.scrollWidth - area.clientWidth }
+  })
+  const release = geometry.naturalRight - geometry.edge
+  // Check pinned position, release into the normal columns, and reverse scrolling.
+  const positions = release > 0 ? [0, release / 2, Math.min(geometry.max, release + 24), geometry.max, 0] : [0]
+  for (const position of positions) {
+    const actualScroll = await scroller.evaluate((el, left) => { el.scrollLeft = left; return el.scrollLeft }, position)
+    const head = await header.boundingBox()
+    const cell = await amount.boundingBox()
+    const expectedRight = Math.min(geometry.edge, geometry.naturalRight - actualScroll)
+    expect(Math.abs(head.x + head.width - expectedRight)).toBeLessThanOrEqual(1)
+    expect(Math.abs(cell.x - head.x)).toBeLessThanOrEqual(1)
+    expect(Math.abs(cell.width - head.width)).toBeLessThanOrEqual(1)
+    // At the pinned edge, the amount owns hit testing rather than underlying columns.
+    if (position === 0 && release > 0) {
+      await amount.scrollIntoViewIfNeeded()
+      expect(await amount.evaluate((el) => {
+        const box = el.getBoundingClientRect()
+        return el.contains(document.elementFromPoint(box.right - 8, box.top + box.height / 2))
+      })).toBe(true)
+    }
+  }
+}
+
 for (const role of ['guest', 'admin']) {
   for (const width of [320, 360, 380, 390, 430, 1280]) {
     test(`${role} at ${width}px keeps horizontal scrolling inside tables`, async ({ page }) => {
@@ -76,6 +112,7 @@ for (const role of ['guest', 'admin']) {
       const scroller = table.locator('..')
       await scroller.scrollIntoViewIfNeeded()
       expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
+      await checkStickyAmount(table)
       if (width < 640) {
         const dimensions = await scroller.evaluate((el) => ({ container: el.clientWidth, table: el.querySelector('table').getBoundingClientRect().width }))
         expect(dimensions.table).toBeGreaterThanOrEqual(768)
@@ -102,6 +139,12 @@ for (const role of ['guest', 'admin']) {
       await page.mouse.wheel(1000, 0)
       expect(await page.evaluate(() => window.scrollX)).toBe(0)
       if (width === 380) await page.screenshot({ path: `test-results/horizontal-${role}.png` })
+      if (role === 'admin') {
+        await page.getByRole('tab', { name: 'Dompet', exact: true }).click()
+        await checkStickyAmount(table)
+        await page.getByRole('tab', { name: 'Kategori', exact: true }).click()
+        await expect(table.locator('.table-amount')).toHaveCount(0)
+      }
     })
   }
 }

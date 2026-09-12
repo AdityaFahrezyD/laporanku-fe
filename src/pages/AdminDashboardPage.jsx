@@ -381,7 +381,7 @@ export default function AdminDashboardPage({
                   </th>
                   <th className="p-4">Keterangan</th>
                   {tab !== "categories" && (
-                    <th className="p-4 text-right">
+                    <th className="table-amount p-4 text-right">
                       {tab === "wallets" ? "Saldo" : "Nominal"}
                     </th>
                   )}
@@ -404,7 +404,7 @@ export default function AdminDashboardPage({
                     </td>
                     <td className="p-4 text-xs text-muted">{describe(row)}</td>
                     {tab !== "categories" && (
-                      <td className="p-4 text-right font-medium tabular-nums whitespace-nowrap">
+                      <td className="table-amount p-4 text-right font-medium tabular-nums whitespace-nowrap">
                         {formatRupiah(
                           tab === "wallets" ? row.balance : row.amount
                         )}

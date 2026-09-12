@@ -13,7 +13,7 @@ export default function TransactionTable({ transactions, types, onDetail, title,
               <th className="p-4">Transaksi</th>
               <th className="p-4">Dompet</th>
               <th className="p-4">Tanggal</th>
-              <th className="p-4 text-right">Nominal</th>
+              <th className="table-amount p-4 text-right">Nominal</th>
               <th className="p-4 text-right">Detail</th>
             </tr>
           </thead>
@@ -38,7 +38,7 @@ export default function TransactionTable({ transactions, types, onDetail, title,
                   </td>
                   <td className="p-4 text-xs text-muted">{transaction.walletName}</td>
                   <td className="whitespace-nowrap p-4 text-xs text-muted">{formatDate(transaction.transaction_date)}</td>
-                  <td className={`whitespace-nowrap p-4 text-right font-semibold tabular-nums ${transaction.type === "expense" ? "text-secondary" : "text-primary"}`}>
+                  <td className={`table-amount whitespace-nowrap p-4 text-right font-semibold tabular-nums ${transaction.type === "expense" ? "text-secondary" : "text-primary"}`}>
                     <span className="sr-only">{type.label}: </span>
                     {type.prefix}{formatRupiah(transaction.amount)}
                   </td>
