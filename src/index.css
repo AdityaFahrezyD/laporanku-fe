@@ -43,6 +43,23 @@ body {
   overscroll-behavior-x: contain;
 }
 
+/* Keep readable columns even when the surrounding card is narrower than the table. */
+.table-scroll > table {
+  width: max-content;
+  min-width: max(100%, 48rem);
+  overflow-wrap: normal;
+  word-break: normal;
+  white-space: nowrap;
+}
+
+.table-description {
+  width: 20rem;
+  max-width: 20rem;
+  flex-shrink: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 button,
 a {
   -webkit-tap-highlight-color: transparent;

@@ -373,7 +373,7 @@ export default function AdminDashboardPage({
         )}
         <Card className="!p-0 overflow-hidden">
           <div className="table-scroll">
-            <table className="w-full text-left text-sm">
+            <table className="text-left text-sm">
               <thead className="bg-primary/5 text-xs text-muted">
                 <tr>
                   <th className="p-4">
@@ -392,7 +392,7 @@ export default function AdminDashboardPage({
                 {visible.map((row) => (
                   <tr key={row[meta.key]}>
                     <td className="p-4">
-                      <p className="min-w-32 max-w-xs break-words font-medium">
+                      <p className={isTransaction(tab) ? "table-description font-medium" : "font-medium"}>
                         {row.name || row.description || meta.label}
                       </p>
                       {isTransaction(tab) && (

@@ -10,6 +10,7 @@ for (const role of ['guest', 'admin']) {
       data.wallets[0].balance = '9999999999999.99'
       data.incomes[0].description = 'DeskripsiTanpaSpasi'.repeat(12)
       data.incomes[0].amount = '9999999999999.99'
+      data.incomes[0].income_wallet = { ...data.wallets[0], name: 'Bank BNI' }
       await page.route('**/api/**', (route) => {
         const key = new URL(route.request().url()).pathname.split('/').pop()
         return route.fulfill({ status: key === 'user' && role === 'guest' ? 401 : 200, contentType: 'application/json',
@@ -18,6 +19,20 @@ for (const role of ['guest', 'admin']) {
       await page.goto('/')
       const table = page.getByRole('table').first()
       await expect(table).toBeVisible()
+      const description = table.locator('.table-description').first()
+      const descriptionMetrics = await description.evaluate((el) => ({ width: el.getBoundingClientRect().width, scroll: el.scrollWidth, client: el.clientWidth }))
+      expect(descriptionMetrics.width).toBe(320)
+      expect(descriptionMetrics.scroll).toBeLessThanOrEqual(descriptionMetrics.client)
+      // Check rendered line heights, not just overflow: words must not stack letter by letter.
+      const readableCells = [...await table.locator('th').all(), table.locator('tbody td').filter({ hasText: 'Bank BNI' }).first()]
+      for (const cell of readableCells) {
+        const metrics = await cell.evaluate((el) => {
+          const range = document.createRange()
+          range.selectNodeContents(el)
+          return { height: range.getBoundingClientRect().height, lineHeight: parseFloat(getComputedStyle(el).lineHeight) }
+        })
+        expect(metrics.height).toBeLessThanOrEqual(metrics.lineHeight + 1)
+      }
       const header = page.locator('header').first()
       for (const button of await header.getByRole('button').all()) {
         const box = await button.boundingBox()
@@ -62,6 +77,9 @@ for (const role of ['guest', 'admin']) {
       await scroller.scrollIntoViewIfNeeded()
       expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
       if (width < 640) {
+        const dimensions = await scroller.evaluate((el) => ({ container: el.clientWidth, table: el.querySelector('table').getBoundingClientRect().width }))
+        expect(dimensions.table).toBeGreaterThanOrEqual(768)
+        expect(dimensions.table).toBeGreaterThan(dimensions.container)
         await scroller.hover()
         await page.mouse.wheel(10000, 0)
         await expect.poll(() => scroller.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0)
@@ -73,6 +91,11 @@ for (const role of ['guest', 'admin']) {
         expect(await page.evaluate(() => window.scrollX)).toBe(0)
         await page.mouse.wheel(-10000, 0)
         await expect.poll(() => scroller.evaluate((el) => el.scrollLeft)).toBe(0)
+        if (width === 380) {
+          // Capture the Dompet/Keterangan column alongside the scrollable table.
+          await scroller.evaluate((el) => { el.scrollLeft = 250 })
+          await scroller.screenshot({ path: `test-results/readable-table-${role}.png` })
+        }
       }
       await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }))
       await header.hover()

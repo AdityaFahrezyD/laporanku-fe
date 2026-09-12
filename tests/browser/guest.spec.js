@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 
-const labels = { incomes: 'Income', expenses: 'Expense', transfers: 'Transfer' }
+const labels = { incomes: 'Pemasukan', expenses: 'Pengeluaran', transfers: 'Transfer' }
 const keys = { incomes: 'income_id', expenses: 'expense_id', transfers: 'transfer_id' }
 const wallet = { wallet_id: 'w1', name: 'Bank Utama', type: 'bank', balance: '1000.00', is_active: true }
 function records(resource, count) {
@@ -65,7 +65,7 @@ for (const view of ['ringkasan', 'incomes', 'expenses', 'transfers']) {
 
 test('attachment detail handles empty lists, legacy URLs and failed images', async ({ page }) => {
   const { db } = await setup(page, '#incomes', 1)
-  await page.getByRole('button', { name: 'Detail Income 0', exact: true }).click()
+  await page.getByRole('button', { name: 'Detail Pemasukan 0', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Detail transaksi' })
   await expect(dialog.getByText('Belum ada attachment.')).toBeVisible()
   await dialog.getByRole('button', { name: 'Tutup', exact: true }).click()
@@ -76,7 +76,7 @@ test('attachment detail handles empty lists, legacy URLs and failed images', asy
   await page.route('**/attachments/missing', route => route.fulfill({ status: 404 }))
   await page.getByRole('button', { name: 'Muat ulang', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Muat ulang', exact: true })).toBeEnabled()
-  await page.getByRole('button', { name: 'Detail Income 0', exact: true }).click()
+  await page.getByRole('button', { name: 'Detail Pemasukan 0', exact: true }).click()
   await expect(dialog.getByText('Gambar lama belum tersedia.')).toBeVisible()
   await dialog.getByRole('link', { name: 'Buka gambar 2 ukuran penuh' }).scrollIntoViewIfNeeded()
   await expect(dialog.getByText('Gambar tidak dapat dimuat')).toBeVisible()
@@ -88,12 +88,12 @@ test('summary shows one globally sorted table and retains wallet cards', async (
   await expect(page.getByRole('heading', { name: 'Dompet', exact: true })).toBeVisible()
   await expect(page.getByRole('table', { name: 'Transaksi terbaru' }).locator('tbody tr')).toHaveCount(5)
   const names = await page.locator('tbody tr td:first-child .font-medium').allTextContents()
-  expect(names).toEqual(['Expense 10', 'Income 10', 'Transfer 10', 'Expense 9', 'Income 9'])
+  expect(names).toEqual(['Pengeluaran 10', 'Pemasukan 10', 'Transfer 10', 'Pengeluaran 9', 'Pemasukan 9'])
   await expect(page.getByRole('navigation', { name: 'Paginasi transaksi' })).toHaveCount(0)
   await expect(page.getByRole('link', { name: 'Dompet', exact: true })).toHaveCount(0)
   db.expenses = []; db.transfers = []
   await page.getByRole('button', { name: 'Muat ulang', exact: true }).click()
-  await expect(page.locator('tbody tr td:first-child .font-medium')).toHaveText(['Income 10', 'Income 9', 'Income 8', 'Income 7', 'Income 6'])
+  await expect(page.locator('tbody tr td:first-child .font-medium')).toHaveText(['Pemasukan 10', 'Pemasukan 9', 'Pemasukan 8', 'Pemasukan 7', 'Pemasukan 6'])
 })
 
 for (const [resource, label] of Object.entries(labels)) {
@@ -129,15 +129,15 @@ for (const [resource, label] of Object.entries(labels)) {
 test('navigation resets pagination and supports history, reload and mobile', async ({ page }) => {
   await setup(page, '#incomes')
   await page.getByRole('button', { name: 'Berikutnya' }).click()
-  await navigate(page, 'Expense')
+  await navigate(page, 'Pengeluaran')
   await expect(page.getByText('Halaman 1 dari 2')).toBeVisible()
   await page.goBack()
-  await expect(page.getByRole('table', { name: 'Income', exact: true })).toBeVisible()
+  await expect(page.getByRole('table', { name: 'Pemasukan', exact: true })).toBeVisible()
   await expect(page.getByText('Halaman 1 dari 2')).toBeVisible()
   await page.goForward()
-  await expect(page.getByRole('table', { name: 'Expense', exact: true })).toBeVisible()
+  await expect(page.getByRole('table', { name: 'Pengeluaran', exact: true })).toBeVisible()
   await page.reload()
-  await expect(page.getByRole('table', { name: 'Expense', exact: true })).toBeVisible()
+  await expect(page.getByRole('table', { name: 'Pengeluaran', exact: true })).toBeVisible()
   await page.setViewportSize({ width: 390, height: 844 })
   await page.getByRole('button', { name: 'Buka menu navigasi' }).click()
   await page.getByRole('dialog', { name: 'Menu navigasi' }).getByRole('link', { name: 'Transfer', exact: true }).click()
@@ -149,7 +149,7 @@ test('navigation resets pagination and supports history, reload and mobile', asy
 test('unknown hash falls back to summary and cooldown keeps data on transaction views', async ({ page }) => {
   const { state } = await setup(page, '#unknown')
   await expect(page.getByRole('heading', { name: 'Ringkasan keuangan' })).toBeVisible()
-  await navigate(page, 'Income')
+  await navigate(page, 'Pemasukan')
   state.fail = true
   await page.getByRole('button', { name: 'Muat ulang', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('HTTP 429')

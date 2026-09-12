@@ -7,7 +7,7 @@ export default function TransactionTable({ transactions, types, onDetail, title,
   return (
     <Card className="!p-0 overflow-hidden">
       <div className="table-scroll">
-        <table aria-label={title} className="w-full text-left text-sm">
+        <table aria-label={title} className="text-left text-sm">
           <thead className="bg-primary/5 text-xs text-muted">
             <tr>
               <th className="p-4">Transaksi</th>
@@ -28,9 +28,9 @@ export default function TransactionTable({ transactions, types, onDetail, title,
                       <span className={`hidden size-10 shrink-0 items-center justify-center rounded-xl sm:flex ${type.color}`}>
                         <Icon name={type.icon} />
                       </span>
-                      <div className="min-w-32 max-w-xs break-words">
+                      <div className="table-description">
                         <p className="font-medium">{name}</p>
-                        <p className="mt-1 text-xs text-muted">
+                        <p className="mt-1 whitespace-nowrap text-xs text-muted">
                           {transaction.category?.name || (transaction.type === "transfer" ? "Antardompet" : "Tanpa kategori")}
                         </p>
                       </div>
