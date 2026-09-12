@@ -154,10 +154,13 @@ test('new service worker waits for consent and postponing preserves form input',
   await otherTab.close()
 })
 
-test('install offer uses browser prompt and disappears after installation', async ({ page }) => {
+for (const mobile of [false, true]) test(`install offer stays in ${mobile ? 'mobile' : 'desktop'} menu and disappears after installation`, async ({ page }) => {
   await api(page)
-  await page.goto('/admin')
-  await expect(page.getByRole('textbox', { name: 'Email (wajib)', exact: true })).toBeVisible()
+  if (mobile) await page.setViewportSize({ width: 390, height: 480 })
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Ringkasan keuangan' })).toBeVisible()
+  if (mobile) await page.getByRole('button', { name: 'Buka menu navigasi' }).click()
+  const menu = page.getByRole('navigation', { name: 'Navigasi utama' })
   // Native install dialogs are outside Playwright; exercise the browser event contract.
   await page.evaluate(() => {
     const event = new Event('beforeinstallprompt', { cancelable: true })
@@ -165,7 +168,8 @@ test('install offer uses browser prompt and disappears after installation', asyn
     event.userChoice = Promise.resolve({ outcome: 'accepted' })
     window.dispatchEvent(event)
   })
-  await page.getByRole('button', { name: 'Pasang aplikasi', exact: true }).click()
+  await expect(page.getByRole('complementary', { name: 'Status aplikasi' })).toHaveCount(0)
+  await menu.getByRole('button', { name: 'Pasang aplikasi', exact: true }).click()
   expect(await page.evaluate(() => window.installRequested)).toBe(true)
   await page.evaluate(() => window.dispatchEvent(new Event('appinstalled')))
   await expect(page.getByRole('button', { name: 'Pasang aplikasi', exact: true })).toHaveCount(0)
@@ -174,11 +178,43 @@ test('install offer uses browser prompt and disappears after installation', asyn
 test('iOS install guidance is available and standalone mode hides it', async ({ page }) => {
   await page.addInitScript(() => Object.defineProperty(navigator, 'userAgent', { get: () => 'iPhone Safari' }))
   await api(page)
-  await page.goto('/admin')
-  await page.getByRole('button', { name: 'Cara memasang aplikasi' }).click()
-  await expect(page.getByText(/Di Safari, buka menu Bagikan/)).toBeVisible()
+  await page.setViewportSize({ width: 390, height: 480 })
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Buka menu navigasi' }).click()
+  const menu = page.getByRole('navigation', { name: 'Navigasi utama' })
+  await menu.getByRole('button', { name: 'Cara memasang aplikasi' }).click()
+  await expect(menu.getByText(/Di Safari, buka menu Bagikan/)).toBeVisible()
   await page.addInitScript(() => Object.defineProperty(navigator, 'standalone', { get: () => true }))
   await page.reload()
-  await expect(page.getByRole('heading', { name: 'Selamat datang kembali' })).toBeVisible()
+  await page.getByRole('button', { name: 'Buka menu navigasi' }).click()
   await expect(page.getByRole('button', { name: 'Cara memasang aplikasi' })).toHaveCount(0)
+})
+
+test('login has no installation UI and dismissing a prompt permits a later offer', async ({ page }) => {
+  await api(page)
+  await page.goto('/admin')
+  await expect(page.getByRole('heading', { name: 'Selamat datang kembali' })).toBeVisible()
+  async function offer(outcome) {
+    await page.evaluate((outcome) => {
+      const event = new Event('beforeinstallprompt', { cancelable: true })
+      event.prompt = async () => {}
+      event.userChoice = Promise.resolve({ outcome })
+      window.dispatchEvent(event)
+    }, outcome)
+  }
+  await offer('dismissed')
+  await expect(page.getByRole('button', { name: 'Pasang aplikasi' })).toHaveCount(0)
+  await expect(page.getByRole('complementary', { name: 'Status aplikasi' })).toHaveCount(0)
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Ringkasan keuangan' })).toBeVisible()
+  await offer('dismissed')
+  const button = page.getByRole('navigation', { name: 'Navigasi utama' }).getByRole('button', { name: 'Pasang aplikasi' })
+  await button.click()
+  await expect(button).toHaveCount(0)
+  await offer('accepted')
+  await expect(button).toBeVisible()
+  await button.click()
+  await page.evaluate(() => window.dispatchEvent(new Event('appinstalled')))
+  await offer('accepted')
+  await expect(button).toHaveCount(0)
 })

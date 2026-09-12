@@ -22,8 +22,20 @@ Build produksi menyediakan manifest, ikon instalasi, dan service worker. Jalanka
 `npm run build` lalu `npm run preview` untuk mencobanya; service worker tidak
 didaftarkan oleh `npm run dev`. Deployment harus memakai HTTPS (localhost boleh
 untuk pengujian). Di browser yang mendukung, tombol **Pasang aplikasi** muncul
-setelah browser menyediakan penawaran instalasi. Di iOS tersedia petunjuk Safari:
-Bagikan → Tambahkan ke Layar Utama. Penawaran disembunyikan pada mode standalone.
+sebagai item terakhir **Menu Utama** pada sidebar guest/admin, setelah browser
+menyediakan penawaran instalasi. Tombol ini tidak tampil mengambang atau di
+halaman login. Di iOS, **Cara memasang aplikasi** membuka petunjuk inline:
+Bagikan → Tambahkan ke Layar Utama. Penawaran disembunyikan setelah event
+`appinstalled` dan pada mode standalone; membatalkan dialog tidak dianggap
+berhasil memasang. Safari biasa tidak selalu dapat mendeteksi pemasangan di
+layar utama sehingga petunjuk masih dapat tampil ketika dibuka dari browser.
+
+Drawer navigasi mobile memakai header putih dan isi hijau sampai bawah layar.
+Logo serta footer Bismillah tetap di tempat, hanya daftar Menu Utama yang dapat
+digulir. Halaman belakang dikunci selama drawer terbuka; menutupnya memulihkan
+posisi scroll dan fokus. Sidebar desktop memakai susunan yang sama, sementara
+dashboard tetap dapat digulir sendiri. Notifikasi offline dan pembaruan tetap
+terpisah dari tombol pemasangan.
 
 Service worker hanya menyimpan aset statis build, manifest, ikon, dan halaman
 offline. Dokumen navigasi diminta dari jaringan; kegagalan koneksi menampilkan

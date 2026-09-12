@@ -149,6 +149,22 @@ test('guest retains public dashboard and cannot see CRUD tabs', async ({ page })
   await expect(page.getByRole('button', { name: /Tambah/ })).toHaveCount(0)
 })
 
+test('all admin menu items remain reachable above the fixed footer on a short screen', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 400 })
+  await setup(page)
+  await page.getByRole('button', { name: 'Buka menu navigasi' }).click()
+  const drawer = page.getByRole('dialog', { name: 'Menu navigasi' })
+  const menu = drawer.getByRole('navigation', { name: 'Navigasi utama' })
+  await expect(menu.getByRole('link')).toHaveCount(5)
+  const footer = await drawer.locator('.sidebar-footer').boundingBox()
+  await menu.getByRole('link', { name: 'Kategori', exact: true }).focus()
+  const last = await menu.getByRole('link', { name: 'Kategori', exact: true }).boundingBox()
+  expect(last.y + last.height).toBeLessThanOrEqual(footer.y)
+  await page.keyboard.press('Enter')
+  await expect(drawer).not.toBeVisible()
+  await expect(page.getByRole('button', { name: '+ Tambah kategori', exact: true })).toBeVisible()
+})
+
 for (const [label, resource, singular] of [['Expenses', 'expenses', 'expense'], ['Transfer', 'transfers', 'transfer']]) {
   test(label + ' supports create detail edit and delete with attachment slots', async ({ page }) => {
     const { writes } = await setup(page)

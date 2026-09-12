@@ -4,6 +4,7 @@ const paths = {
   arrows: 'M4 7h15l-4-4 M20 17H5l4 4 M19 7l-4 4 M5 17l4-4',
   up: 'M7 17 17 7 M7 7h10v10',
   down: 'M7 7l10 10 M7 17h10V7',
+  download: 'M12 3v12 M7 10l5 5 5-5 M4 16v5h16v-5',
   menu: 'M4 6h16 M4 12h16 M4 18h16',
   close: 'm6 6 12 12 M6 18 18 6',
   chevron: 'm9 5 7 7-7 7',

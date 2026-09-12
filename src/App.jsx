@@ -4,6 +4,7 @@ import AdminDashboardPage from './pages/AdminDashboardPage'
 import LoginPage from './pages/LoginPage'
 import { loadSession, logout } from './services/auth'
 import PwaControls from './components/organisms/PwaControls'
+import InstallProvider from './components/templates/InstallProvider'
 
 export default function App() {
   const [user, setUser] = useState(null)
@@ -30,12 +31,12 @@ export default function App() {
     } catch (error) { setSessionError(error) } finally { setLoggingOut(false) }
   }
 
-  return <>
+  return <InstallProvider>
     {window.location.pathname.replace(/\/$/, '') === '/admin'
       ? <LoginPage user={user} checking={checking} sessionError={sessionError} onAuthenticated={(account) => { setUser(account); setSessionError(null) }} onLogout={handleLogout} />
       : user?.role === 'admin'
         ? <AdminDashboardPage user={user} onLogout={handleLogout} loggingOut={loggingOut} sessionError={sessionError} />
         : <DashboardPage user={user} onLogout={handleLogout} loggingOut={loggingOut} sessionError={sessionError} />}
     <PwaControls />
-  </>
+  </InstallProvider>
 }
