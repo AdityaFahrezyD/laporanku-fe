@@ -36,7 +36,7 @@ export default function DashboardLayout({
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
       />
-      <header className="flex min-h-20 min-w-0 flex-wrap items-center justify-between gap-2 border-b border-primary/10 px-4 py-3 sm:gap-4 sm:px-8 lg:px-10">
+      <header className="sticky top-0 z-20 flex min-h-20 min-w-0 flex-wrap items-center justify-between gap-2 border-b border-primary/10 bg-base px-4 py-3 sm:gap-4 sm:px-8 lg:static lg:px-10">
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <Button
             variant="ghost"
