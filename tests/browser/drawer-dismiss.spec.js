@@ -1,11 +1,16 @@
+import { queryFixture } from '../queryFixture.js'
 import { test, expect } from '@playwright/test'
 import * as mock from '../../src/data/dashboardMock.js'
+
+test.beforeEach(async ({ page }) => { await page.clock.setFixedTime(new Date('2026-09-14T03:00:00Z')) })
 
 test.use({ viewport: { width: 390, height: 480 }, hasTouch: true })
 
 for (const role of ['guest', 'admin']) {
   test(`${role} drawer dismisses only an outside tap and restores scroll and focus`, async ({ page }) => {
     await page.route('**/api/**', (route) => {
+      const paginated = queryFixture(mock, route.request().url())
+      if (paginated) return route.fulfill({ json: paginated })
       const [, key, id] = new URL(route.request().url()).pathname.split('/').filter(Boolean)
       const records = mock[key] || []
       const data = id ? records.find((record) => Object.entries(record).some(([field, value]) => field.endsWith('_id') && value === id)) : records

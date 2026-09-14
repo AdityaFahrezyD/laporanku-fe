@@ -9,11 +9,13 @@ import {
   Placeholder,
 } from "../components";
 import TransactionTable from "../components/organisms/TransactionTable";
+import PeriodFilter from "../components/organisms/PeriodFilter";
 import WalletCards from "../components/organisms/WalletCards";
 import useDashboard from "../hooks/useDashboard";
 import { FETCH_BASE_URL } from "../services/api";
-import { latestTransactions, normalizeTransactions } from "../services/dashboard";
-import { formatDate, formatRupiah, sumAmounts } from "../utils/format";
+import { normalizeTransactions } from "../services/dashboard";
+import { formatDate, formatRupiah } from "../utils/format";
+import useDebouncedValue from "../hooks/useDebouncedValue";
 
 const types = {
   income: {
@@ -42,7 +44,6 @@ const views = {
   expenses: "Pengeluaran",
   transfers: "Transfer",
 };
-const viewTypes = { incomes: "income", expenses: "expense", transfers: "transfer" };
 function currentView() {
   const hash = window.location.hash.slice(1);
   return Object.hasOwn(views, hash) ? hash : "ringkasan";
@@ -54,24 +55,24 @@ export default function DashboardPage({
   loggingOut,
   sessionError,
 }) {
-  const { data, loading, error, updatedAt, retryIn, refresh } = useDashboard();
   const [selected, setSelected] = useState(null);
-  const { wallets = [], incomes = [], expenses = [] } = data || {};
   const [view, setView] = useState(currentView);
   const [page, setPage] = useState(1);
+  const [period, setPeriod] = useState({ mode: "all" });
+  const [query, setQuery] = useState("");
+  const debouncedQuery = useDebouncedValue(query);
+  const { data, loading, error, updatedAt, retryIn, refresh } = useDashboard({ resource: view, page, period, query: debouncedQuery });
+  const searching = query !== debouncedQuery;
+  const { wallets = [] } = data || {};
   const isSummary = view === "ringkasan";
-  const transactions = data
-    ? isSummary
-      ? latestTransactions(data)
-      : normalizeTransactions(data).filter((row) => row.type === viewTypes[view])
-    : [];
-  const pages = Math.max(1, Math.ceil(transactions.length / 10));
-  const currentPage = Math.min(page, pages);
-  if (page > pages) setPage(pages);
-  const visible = isSummary
-    ? transactions
-    : transactions.slice((currentPage - 1) * 10, currentPage * 10);
+  const transactionPage = searching ? null : data?.transactionPage;
+  const transactions = isSummary ? (data?.summary.latest || []).map(row => normalizeTransactions({ [row.type + 's']: [row] })[0]) : normalizeTransactions({ [view]: transactionPage?.data || [] });
+  const pages = transactionPage?.meta.last_page || 1;
+  const currentPage = page;
+  if (transactionPage && page > pages) setPage(pages);
+  const visible = transactions;
   function navigate(id) {
+    setQuery("");
     setView(Object.hasOwn(views, id) ? id : "ringkasan");
     setPage(1);
     setSelected(null);
@@ -162,7 +163,7 @@ export default function DashboardPage({
                   </span>
                   <p className="text-sm text-white/70">Total saldo</p>
                   <p className="mt-2 break-words text-[clamp(1.35rem,2.2vw,2rem)] font-semibold tracking-tight tabular-nums">
-                    {formatRupiah(sumAmounts(wallets, "balance"))}
+                    {formatRupiah(data.summary.totals.balance)}
                   </p>
                   <p className="mt-5 border-t border-white/15 pt-4 text-xs text-white/65">
                     Tersimpan di {wallets.length} dompet
@@ -170,9 +171,9 @@ export default function DashboardPage({
                 </div>
               </Card>
               {[
-                { title: "Total pemasukan", data: incomes, type: "income" },
-                { title: "Total pengeluaran", data: expenses, type: "expense" },
-              ].map(({ title, data, type }) => (
+                { title: "Total pemasukan", amount: data.summary.totals.incomes, count: data.summary.counts.incomes, type: "income" },
+                { title: "Total pengeluaran", amount: data.summary.totals.expenses, count: data.summary.counts.expenses, type: "expense" },
+              ].map(({ title, amount, count, type }) => (
                 <Card key={type}>
                   <span
                     className={`mb-6 flex size-10 items-center justify-center rounded-xl ${types[type].color}`}
@@ -181,11 +182,11 @@ export default function DashboardPage({
                   </span>
                   <p className="text-sm text-muted">{title}</p>
                   <p className="mt-2 break-words text-[clamp(1.35rem,2.2vw,2rem)] font-semibold tracking-tight tabular-nums">
-                    {formatRupiah(sumAmounts(data))}
+                    {formatRupiah(amount)}
                   </p>
                   <p className="mt-5 border-t border-primary/10 pt-4 text-xs text-muted">
                     Seluruh periode <span className="mx-1">·</span>{" "}
-                    {data.length} transaksi
+                    {count} transaksi
                   </p>
                 </Card>
               ))}
@@ -194,31 +195,36 @@ export default function DashboardPage({
         )}
       </section>
 
-      {data && (
+      {(data || !isSummary) && (
         <>
           {isSummary && <WalletCards wallets={wallets} />}
           <section aria-labelledby="transactions-heading" className={isSummary ? "mt-9" : ""}>
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-              <h2 id="transactions-heading" className="text-lg font-semibold">
-                {isSummary ? "Transaksi terbaru" : "Daftar transaksi"}
-              </h2>
-              <span className="text-xs text-muted">
-                {transactions.length} {isSummary ? "transaksi terakhir" : "transaksi"}
-              </span>
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <h2 id="transactions-heading" className="text-lg font-semibold">
+                  {isSummary ? "Transaksi terbaru" : "Daftar transaksi"}
+                </h2>
+                {!isSummary && <p className="mt-1 text-xs text-muted">{transactionPage?.meta.total ?? 0} transaksi</p>}
+              </div>
+              {isSummary ? <span className="text-xs text-muted">
+                {transactions.length} transaksi terakhir
+              </span> : <PeriodFilter value={period} disabled={retryIn > 0} onChange={(next) => { setPeriod(next); setPage(1); }} />}
             </div>
-            <TransactionTable
+            {!isSummary && <input aria-label="Cari transaksi" placeholder="Cari transaksi…" maxLength={200} value={query} onChange={e => { setQuery(e.target.value); setPage(1); }} className="mb-4 w-full rounded-xl border border-primary/15 bg-white px-4 py-3 text-sm" />}
+            {(loading || searching) && !isSummary ? <p role="status">Sedang memuat transaksi…</p> : (isSummary || transactionPage) && <TransactionTable
               transactions={visible}
               types={types}
               onDetail={setSelected}
               title={isSummary ? "Transaksi terbaru" : views[view]}
-              emptyMessage={isSummary ? "Belum ada transaksi dalam pembukuan ini." : `Belum ada transaksi ${views[view].toLowerCase()} dalam pembukuan ini.`}
-            />
-            {!isSummary && (
+              emptyMessage={isSummary ? "Belum ada transaksi dalam pembukuan ini." : "Tidak ada transaksi pada filter ini"}
+              total={isSummary ? undefined : transactionPage.summary.total_amount}
+            />}
+            {!isSummary && transactionPage && (
               <nav aria-label="Paginasi transaksi" className="mt-4 flex flex-wrap items-center justify-between gap-3">
                 <p className="text-xs text-muted">Halaman {currentPage} dari {pages}</p>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>Sebelumnya</Button>
-                  <Button variant="outline" size="sm" disabled={currentPage === pages} onClick={() => setPage(currentPage + 1)}>Berikutnya</Button>
+                  <Button variant="outline" size="sm" disabled={loading || searching || retryIn > 0 || currentPage === 1} onClick={() => setPage(currentPage - 1)}>Sebelumnya</Button>
+                  <Button variant="outline" size="sm" disabled={loading || searching || retryIn > 0 || currentPage === pages} onClick={() => setPage(currentPage + 1)}>Berikutnya</Button>
                 </div>
               </nav>
             )}

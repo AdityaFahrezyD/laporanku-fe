@@ -1,6 +1,6 @@
+import { fetchTransactionPage, fetchSummary } from './transactions.js'
 import { ApiError, getJson } from './api.js'
 
-const resources = ['wallets', 'incomes', 'expenses', 'transfers']
 const primaryKeys = { wallets: 'wallet_id', incomes: 'income_id', expenses: 'expense_id', transfers: 'transfer_id' }
 const decimal = /^\d+(\.\d{1,2})?$/
 
@@ -17,22 +17,22 @@ function readList(resource, response) {
   return records
 }
 
-export async function fetchDashboard(options) {
-  // Publish one complete result so a failed list never produces misleading totals.
-  const results = await Promise.allSettled(resources.map(async (resource) => readList(resource, await getJson(`/api/${resource}`, options))))
-  const failures = results.filter((result) => result.status === 'rejected').map((result) => result.reason)
-  if (failures.length) {
-    const limited = failures.filter((error) => error.status === 429).sort((a, b) => b.retryAt - a.retryAt)
-    throw limited[0] || failures[0]
-  }
-  return Object.fromEntries(resources.map((resource, index) => [resource, results[index].value]))
+export async function fetchDashboard(options, filters = { resource: 'ringkasan' }) {
+  const results = await Promise.allSettled([
+    getJson('/api/wallets', options).then(result => readList('wallets', result)),
+    fetchSummary(options),
+    filters.resource !== 'ringkasan' ? fetchTransactionPage(filters.resource, filters, options) : Promise.resolve(null),
+  ])
+  const failures = results.filter(result => result.status === 'rejected').map(result => result.reason)
+  if (failures.length) throw failures.sort((a, b) => (b.retryAt || 0) - (a.retryAt || 0))[0]
+  return { wallets: results[0].value, summary: results[1].value, transactionPage: results[2].value }
 }
 
-let pendingRequest
-export function loadDashboard() {
-  // Share only the in-flight request, including React StrictMode's initial effects.
-  if (!pendingRequest) pendingRequest = fetchDashboard().finally(() => { pendingRequest = undefined })
-  return pendingRequest
+const pending = new Map()
+export function loadDashboard(filters) {
+  const key = JSON.stringify(filters)
+  if (!pending.has(key)) pending.set(key, fetchDashboard(undefined, filters).finally(() => pending.delete(key)))
+  return pending.get(key)
 }
 
 export function normalizeTransactions({ incomes = [], expenses = [], transfers = [] }) {

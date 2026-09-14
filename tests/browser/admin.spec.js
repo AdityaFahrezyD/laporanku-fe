@@ -1,5 +1,14 @@
+import { queryFixture } from '../queryFixture.js'
 import { test, expect } from '@playwright/test'
 import { Buffer } from 'node:buffer'
+
+test.beforeEach(async ({ page }) => { await page.clock.setFixedTime(new Date('2026-09-14T03:00:00Z')) })
+
+function responseDate(value) {
+  const [date, time] = value.split(' ')
+  const [day, month, year] = date.split('-')
+  return new Date(`${year}-${month}-${day}T${time}:00+07:00`).toISOString()
+}
 
 async function setup(page, role = 'admin', failSecond = false) {
   const db = { incomes: [], expenses: [], transfers: [], wallets: [
@@ -20,6 +29,8 @@ async function setup(page, role = 'admin', failSecond = false) {
     const reply = (body, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
     if (resource === 'user') return role ? reply({ id: 'admin', role, name: 'Administrator' }) : reply({}, 401)
     if (resource === 'logout') return route.fulfill({ status: 204 })
+    const paginated = queryFixture(db, request.url())
+    if (method === 'GET' && paginated) return reply(paginated)
     if (!db[resource]) return reply({}, 404)
     if (method !== 'GET') writes.push({ resource, method, id, attachmentId, body: attachments ? request.postData() : request.postDataJSON() })
     const row = db[resource].find((r) => r[keys[resource]] === id)
@@ -36,8 +47,12 @@ async function setup(page, role = 'admin', failSecond = false) {
     if (method === 'GET') return reply({ data: id ? row : db[resource] })
     if (method === 'DELETE') { db[resource] = db[resource].filter((r) => r[keys[resource]] !== id); return reply({ message: 'Dihapus' }) }
     const body = request.postDataJSON()
-    if (method === 'PATCH') { Object.assign(row, body); return reply({ data: row }) }
-    const created = { ...body, [keys[resource]]: resource + (db[resource].length + 1), attachments: [], transaction_date: '2026-09-10T03:00:00Z', income_wallet: db.wallets[0], expense_wallet: db.wallets[0], transfer_from: db.wallets[0], transfer_to: db.wallets[1] }
+    if (method === 'PATCH') {
+      Object.assign(row, body)
+      if (body.transaction_date) row.transaction_date = responseDate(body.transaction_date)
+      return reply({ data: row })
+    }
+    const created = { ...body, [keys[resource]]: resource + (db[resource].length + 1), attachments: [], transaction_date: body.transaction_date ? responseDate(body.transaction_date) : undefined, income_wallet: db.wallets[0], expense_wallet: db.wallets[0], transfer_from: db.wallets[0], transfer_to: db.wallets[1] }
     db[resource].push(created)
     return reply({ data: created }, 201)
   })
@@ -120,7 +135,7 @@ test('admin tabs create income and retry only failed attachment then edit and de
   expect(writes.find((w) => w.method === 'PATCH').body.amount).toBe('30.00')
   await page.getByRole('button', { name: 'Hapus', exact: true }).click()
   await page.getByRole('button', { name: 'Ya, hapus', exact: true }).click()
-  await expect(page.getByText('Belum ada data. Mulai dengan tombol tambah.')).toBeVisible()
+  await expect(page.getByText('Tidak ada transaksi pada filter ini')).toBeVisible()
 })
 
 test('wallet edit deactivates without balance and category CRUD is available on mobile', async ({ page }) => {
@@ -200,7 +215,7 @@ for (const [label, resource, singular] of [['Expenses', 'expenses', 'expense'], 
     await page.screenshot({ path: 'test-results/admin-' + resource + '.png', fullPage: true })
     await page.getByRole('button', { name: 'Hapus', exact: true }).click()
     await page.getByRole('button', { name: 'Ya, hapus', exact: true }).click()
-    await expect(page.getByText('Belum ada data. Mulai dengan tombol tambah.')).toBeVisible()
+    await expect(page.getByText('Tidak ada transaksi pada filter ini')).toBeVisible()
   })
 }
 test('wallet create sends initial balance and category edit/delete use their APIs', async ({ page }) => {

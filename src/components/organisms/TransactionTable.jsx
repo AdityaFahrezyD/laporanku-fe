@@ -1,9 +1,10 @@
 import Button from "../atoms/Button";
 import Icon from "../atoms/Icon";
 import Card from "../molecules/Card";
+import TransactionTotal from "../molecules/TransactionTotal";
 import { formatDate, formatRupiah } from "../../utils/format";
 
-export default function TransactionTable({ transactions, types, onDetail, title, emptyMessage }) {
+export default function TransactionTable({ transactions, types, onDetail, title, emptyMessage, total }) {
   return (
     <Card className="!p-0 overflow-hidden">
       <div className="table-scroll">
@@ -54,6 +55,7 @@ export default function TransactionTable({ transactions, types, onDetail, title,
         </table>
       </div>
       {transactions.length === 0 && <p className="p-6 text-sm text-muted">{emptyMessage}</p>}
+      {total !== undefined && <TransactionTotal total={total} />}
     </Card>
   );
 }

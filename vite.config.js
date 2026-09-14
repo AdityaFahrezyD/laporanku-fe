@@ -5,7 +5,12 @@ import { API_BASE_URL } from './src/services/api.js'
 import { VitePWA } from 'vite-plugin-pwa'
 export default defineConfig(() => {
 
-  const proxy = { target: API_BASE_URL, changeOrigin: true }
+  const proxy = {
+    target: API_BASE_URL,
+    changeOrigin: true,
+    // Store backend cookies on the local frontend host during development.
+    cookieDomainRewrite: '',
+  }
   return {
     plugins: [react(), tailwindcss(), VitePWA({
       strategies: 'injectManifest',

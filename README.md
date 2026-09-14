@@ -96,11 +96,39 @@ import { Placeholder } from './components'
 
 ## Kontrak data
 
-Dashboard mengambil `GET /api/wallets`, `/api/incomes`, `/api/expenses`, dan `/api/transfers` dengan cookie serta header `Accept: application/json`. Respons memakai `{ message, data: [] }`. Relasi kategori sudah tersedia pada daftar transaksi, sehingga dashboard tidak meminta daftar kategori terpisah.
+Dashboard mengambil `GET /api/wallets`, `/api/dashboard-summary`, dan halaman transaksi tab aktif dengan cookie serta header `Accept: application/json`. Relasi kategori sudah tersedia pada daftar transaksi, sehingga dashboard publik tidak meminta daftar kategori terpisah.
 
-Saldo mencakup seluruh wallet termasuk yang nonaktif. Total pemasukan dan pengeluaran memakai seluruh periode; transfer tidak menambah kedua total tersebut. Lima transaksi terbaru digabung dan diurutkan di frontend karena backend belum menyediakan pagination atau endpoint agregasi dashboard. Nominal dihitung sebagai integer sen (BigInt); tanggal ditampilkan dalam WIB.
+Saldo mencakup seluruh wallet termasuk yang nonaktif. Total pemasukan dan pengeluaran memakai seluruh periode; transfer tidak menambah kedua total tersebut. Lima transaksi terbaru digabung dan diurutkan oleh backend. Total berasal dari agregasi database sebagai string desimal; frontend memformat nominal dengan integer sen (BigInt) dan menampilkan tanggal dalam WIB.
 
-Pemuatan awal dan tombol Muat ulang meminta empat daftar. Tidak ada polling atau retry otomatis. Respons 429 menonaktifkan muat ulang selama `Retry-After`. Jika pembaruan gagal, data terakhir tetap ditampilkan dengan pemberitahuan. Jika pemuatan pertama gagal, saldo tidak ditampilkan sebagai nol. Data contoh hanya dipakai sebagai fixture pengujian.
+Pemuatan awal dan tombol Muat ulang meminta ringkasan, dompet, dan halaman transaksi aktif jika ada. Tidak ada polling atau retry otomatis. Respons 429 menonaktifkan muat ulang selama `Retry-After`. Kegagalan pemuatan menampilkan pemberitahuan tanpa total yang menyesatkan. Data contoh hanya dipakai sebagai fixture pengujian.
+
+## Filter periode transaksi
+
+Halaman pemasukan, pengeluaran, dan transfer untuk guest maupun admin dimulai
+dengan **Semua waktu**. Tombol periode di samping judul daftar membuka panel bawah
+di mobile atau dialog di desktop. Pilih **Bulan ini**, **Minggu ini**, **Pilih
+bulan** (bulan dan tahun), **Rentang tanggal**, atau **Semua waktu**, lalu tekan
+**Terapkan**. Batal, Escape, tombol tutup, atau mengetuk latar panel mempertahankan
+filter sebelumnya.
+
+Periode memakai tanggal transaksi dalam WIB, dengan minggu Senin–Minggu dan
+bulan kalender penuh. Rentang mencakup seluruh hari pertama dan terakhir;
+tanggal mulai dan akhir yang sama memilih satu hari. Pilihan periode berlaku
+bersama saat berpindah antara ketiga jenis transaksi dan bertahan selama muat
+ulang data serta CRUD. Reload browser mengembalikannya ke Semua waktu.
+
+Jumlah transaksi dan **Total hasil filter** dihitung dari seluruh hasil sebelum
+pagination 10 baris, termasuk pencarian publik dan admin. Mengganti periode atau pencarian
+mengembalikan halaman ke halaman pertama. Total berada di bawah tabel, sebelum
+pagination, dan tetap terlihat saat tabel digeser horizontal. Hasil kosong
+menampilkan Rp 0; selama pemuatan atau ketika pemuatan gagal, total tidak ditampilkan.
+
+Filter dan total dihitung backend dari seluruh hasil yang cocok; perubahan periode,
+pencarian, dan halaman mengirim permintaan baru. Total transfer menghitung setiap
+transfer sekali. Ringkasan saldo dan total
+pada kartu ringkasan tetap mencakup seluruh periode. Dompet, kategori, dan hak
+akses tidak dipengaruhi filter. Tes browser memakai tanggal tetap agar fixture
+tidak bergantung pada waktu eksekusi.
 
 ## Deployment
 
@@ -122,8 +150,9 @@ Saat integrasi lokal, `GET http://laporanku.test/api/wallets` mengembalikan HTTP
 ## Dashboard admin dan CRUD
 
 Setelah login sebagai admin, halaman utama menampilkan ringkasan serta lima tab.
-Setiap tab memiliki pencarian dan pagination tampilan 10 baris; backend saat ini
-tetap mengirim seluruh daftar. Detail/edit mengambil record terbaru dari API.
+Setiap tab memiliki pencarian dan pagination tampilan 10 baris. Transaksi memakai
+query server; dompet dan kategori tetap memakai daftar lengkap dengan penyaringan
+di frontend. Detail/edit mengambil record terbaru dari API.
 
 - Income/Expenses: dompet, nominal, tanggal/waktu WIB, kategori sesuai jenis, deskripsi.
 - Transfer: dompet asal dan tujuan berbeda, nominal, tanggal/waktu WIB, deskripsi.
@@ -150,8 +179,9 @@ Penghapusan gambar tersimpan langsung berlaku setelah konfirmasi, walaupun
 perubahan field form belum disimpan.
 
 Respons 422 menampilkan error input, 429 membatasi pengiriman sampai Retry-After.
-Setelah perubahan, lima daftar dimuat ulang untuk memperbarui saldo, kategori,
-transaksi, dan metadata attachment. Gagal memuat ulang mempertahankan data terakhir.
+Setelah perubahan, halaman transaksi aktif, ringkasan, dompet, dan kategori dimuat
+ulang. Hasil transaksi dan total tidak ditampilkan selama pemuatan atau setelah
+kegagalan pemuatan agar hasil filter lama tidak terlihat sebagai hasil terbaru.
 Guest tetap menggunakan dashboard publik tanpa kontrol CRUD; otorisasi sebenarnya
 tetap dilakukan backend.
 
@@ -162,3 +192,28 @@ Chrome lokal (channel chrome) dan Vite sementara pada port 5178. Jika Chrome bel
 terpasang, pasang Chrome atau sesuaikan channel konfigurasi Playwright.
 Tes menggunakan API simulasi; tidak menulis database backend lokal.
 Jalankan juga `npm test`, `npm run lint`, dan `npm run build`.
+
+## Query transaksi di backend
+
+Tab transaksi publik dan admin memakai pagination server, 10 baris per halaman.
+Periode awal adalah Semua waktu; pencarian memakai debounce 300 ms. Parameter
+`paginated=1`, `page`, `per_page`, `q`, `start_date`, dan `end_date` dikirim ke
+`/api/incomes`, `/api/expenses`, atau `/api/transfers` sesuai tab aktif. Tanggal
+mewakili hari WIB, termasuk seluruh tanggal akhir. Total hasil filter mencakup
+seluruh halaman dan berasal dari `summary.total_amount` pada respons API.
+
+Kartu seluruh periode dan lima transaksi gabungan terbaru berasal dari
+`/api/dashboard-summary`. Dompet dan kategori tetap memakai daftar lengkap untuk
+pilihan formulir. Tidak ada fallback mengunduh seluruh transaksi jika kontrak
+pagination belum tersedia; rilis backend sebelum frontend ini.
+
+Di backend, jalankan migration `2026_09_14_120000_index_transaction_dates.php`,
+lalu perbarui cache konfigurasi/rute sesuai proses deployment. Verifikasi endpoint
+lama tanpa `paginated` tetap berfungsi, endpoint baru mengembalikan `data`, `meta`,
+dan `summary`, serta endpoint ringkasan tersedia sebelum merilis frontend.
+
+Indeks MySQL lokal diperiksa pada 14 September 2026: ketiga tabel belum memiliki
+indeks tanggal. EXPLAIN pada salinan tabel sementara berubah dari `ALL` menjadi
+`range` setelah penambahan indeks; `Using filesort` masih ada untuk urutan tanggal
+DESC dan ID ASC. Tabel lokal kosong, sehingga pemeriksaan ini bukan benchmark
+performa dan tidak membuktikan peningkatan di hosting.

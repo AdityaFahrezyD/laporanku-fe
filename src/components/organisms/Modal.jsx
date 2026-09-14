@@ -13,6 +13,8 @@ export default function Modal({ open, onClose, title, children, footer, classNam
   const backdropPress = useRef(null)
   const titleId = useId()
   const drawer = variant === 'drawer'
+  const sheet = variant === 'sheet'
+  const lockScroll = drawer || sheet
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -25,7 +27,7 @@ export default function Modal({ open, onClose, title, children, footer, classNam
     const previousBody = Object.fromEntries(bodyProperties.map((key) => [key, document.body.style[key]]))
     const previousRootOverflow = document.documentElement.style.overflow
     document.body.style.overflow = 'hidden'
-    if (drawer) {
+    if (lockScroll) {
       Object.assign(document.body.style, { position: 'fixed', top: -scrollY + 'px', left: -scrollX + 'px', width: '100%' })
       document.documentElement.style.overflow = 'hidden'
     }
@@ -34,18 +36,18 @@ export default function Modal({ open, onClose, title, children, footer, classNam
       backdropPress.current = null
       dialog.close()
       document.body.style.overflow = previousOverflow
-      if (drawer) {
+      if (lockScroll) {
         Object.assign(document.body.style, previousBody)
         document.documentElement.style.overflow = previousRootOverflow
         window.scrollTo({ left: scrollX, top: scrollY, behavior: 'instant' })
       }
       if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus({ preventScroll: true })
     }
-  }, [open, drawer])
+  }, [open, lockScroll])
 
   return createPortal(<dialog ref={dialogRef} aria-labelledby={titleId} aria-modal="true"
     onPointerDown={(event) => {
-      backdropPress.current = drawer && event.isPrimary && event.button === 0 && isOutsidePanel(event)
+      backdropPress.current = lockScroll && event.isPrimary && event.button === 0 && isOutsidePanel(event)
         ? { x: event.clientX, y: event.clientY } : null
     }}
     onPointerMove={(event) => {
@@ -58,7 +60,7 @@ export default function Modal({ open, onClose, title, children, footer, classNam
       backdropPress.current = null
       // Native dialog backdrop clicks target the dialog itself; check coordinates too.
       // Close on a completed tap, never a drag that started inside the panel.
-      if (drawer && start && isOutsidePanel(event) && Math.hypot(event.clientX - start.x, event.clientY - start.y) <= 10) onClose()
+      if (lockScroll && start && isOutsidePanel(event) && Math.hypot(event.clientX - start.x, event.clientY - start.y) <= 10) onClose()
     }}
     onCancel={(event) => {
       // File inputs also emit cancel; only a cancel on this dialog should close it.
@@ -81,12 +83,12 @@ export default function Modal({ open, onClose, title, children, footer, classNam
         first.focus()
       }
     }}
-    className={`${drawer ? 'navigation-drawer' : 'fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-lg overflow-y-auto rounded-2xl'} border-0 bg-white p-0 text-primary shadow-2xl ${className}`}>
+    className={`${drawer ? 'navigation-drawer' : sheet ? 'period-sheet' : 'fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-lg overflow-y-auto rounded-2xl'} border-0 bg-white p-0 text-primary shadow-2xl ${className}`}>
     <div className={`flex shrink-0 items-center justify-between gap-4 border-b border-primary/10 bg-white px-6 py-5 ${drawer ? 'navigation-drawer-header' : ''}`}>
       <h2 id={titleId} className="text-lg font-semibold">{title}</h2>
       <Button variant="ghost" size="sm" aria-label="Tutup dialog" onClick={onClose}><Icon name="close" /></Button>
     </div>
-    <div className={drawer ? 'min-h-0 overflow-hidden bg-primary text-white' : 'p-6'}>{children}</div>
+    <div className={drawer ? 'min-h-0 overflow-hidden bg-primary text-white' : sheet ? 'min-h-0 overflow-y-auto overscroll-contain p-6' : 'p-6'}>{children}</div>
     {footer && <div className="flex justify-end gap-3 border-t border-primary/10 px-6 py-4">{footer}</div>}
   </dialog>, document.body)
 }

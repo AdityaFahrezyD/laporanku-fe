@@ -9,6 +9,8 @@ import {
 } from "../components";
 import WalletCards from "../components/organisms/WalletCards";
 import RecordEditor from "../components/organisms/RecordEditor";
+import PeriodFilter from "../components/organisms/PeriodFilter";
+import TransactionTotal from "../components/molecules/TransactionTotal";
 import { FETCH_BASE_URL, getJson } from "../services/api";
 import {
   fetchAdminData,
@@ -16,7 +18,8 @@ import {
   mutate,
   resources,
 } from "../services/admin";
-import { formatDate, formatRupiah, sumAmounts } from "../utils/format";
+import { formatDate, formatRupiah } from "../utils/format";
+import useDebouncedValue from "../hooks/useDebouncedValue";
 
 const walletLabels = {
   bank: "Rekening bank",
@@ -35,7 +38,7 @@ export default function AdminDashboardPage({
   sessionError,
 }) {
   const [tab, setTab] = useState(initialTab);
-  const [data, setData] = useState(null);
+  const [loaded, setData] = useState(null);
   const [revision, setRevision] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -44,9 +47,15 @@ export default function AdminDashboardPage({
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
+  const [period, setPeriod] = useState({ mode: "all" });
+  const debouncedQuery = useDebouncedValue(query);
+  const requestKey = JSON.stringify({ resource: tab, page: isTransaction(tab) ? page : 1, period: isTransaction(tab) ? period : { mode: 'all' }, query: isTransaction(tab) ? debouncedQuery : '', revision });
+  const data = loaded?.key === requestKey ? loaded.value : null;
+  const transactionPage = query === debouncedQuery ? data?.transactionPage : null;
   const [retryAt, setRetryAt] = useState(0);
   const [now, setNow] = useState(Date.now);
   const opening = useRef(false);
+  const cooldownUntil = useRef(0);
   const meta = resources.find((r) => r.id === tab);
   const blocked = now < retryAt;
   useEffect(() => {
@@ -60,14 +69,16 @@ export default function AdminDashboardPage({
   }, []);
   useEffect(() => {
     let active = true;
-    fetchAdminData()
+    if (Date.now() < cooldownUntil.current) return;
+    fetchAdminData(undefined, JSON.parse(requestKey))
       .then(
         (result) => {
-          if (active) setData(result);
+            if (active) { setData({ key: requestKey, value: result }); setError(null); }
         },
         (failure) => {
           if (active) {
             setError(failure);
+            cooldownUntil.current = failure.retryAt || 0;
             setRetryAt((old) => Math.max(old, failure.retryAt || 0));
             setNow(Date.now);
           }
@@ -79,13 +90,14 @@ export default function AdminDashboardPage({
     return () => {
       active = false;
     };
-  }, [revision]);
+  }, [requestKey]);
   useEffect(() => {
     if (!retryAt) return;
     const timer = setInterval(() => setNow(Date.now), 1000);
     return () => clearInterval(timer);
   }, [retryAt]);
   function cooldown(failure) {
+    cooldownUntil.current = Math.max(cooldownUntil.current, failure.retryAt || 0);
     setRetryAt((old) => Math.max(old, failure.retryAt || 0));
     setNow(Date.now);
   }
@@ -148,26 +160,12 @@ export default function AdminDashboardPage({
       setBusy(false);
     }
   }
-  const rows = (data?.[tab] || []).filter((row) =>
-    [
-      row.name,
-      row.description,
-      row.amount,
-      row.type,
-      row.category?.name,
-      row.income_wallet?.name,
-      row.expense_wallet?.name,
-      row.transfer_from?.name,
-      row.transfer_to?.name,
-    ].some((value) =>
-      String(value || "")
-        .toLowerCase()
-        .includes(query.toLowerCase())
-    )
-  );
-  const pages = Math.max(1, Math.ceil(rows.length / 10));
-  const currentPage = Math.min(page, pages);
-  const visible = rows.slice((currentPage - 1) * 10, currentPage * 10);
+  const rows = isTransaction(tab) ? (transactionPage?.data || []) : (data?.[tab] || []).filter(row => [row.name, row.type].some(value => String(value || '').toLowerCase().includes(query.toLowerCase())));
+  const pages = isTransaction(tab) ? (transactionPage?.meta.last_page || 1) : Math.max(1, Math.ceil(rows.length / 10));
+  const currentPage = isTransaction(tab) ? page : Math.min(page, pages);
+  if ((isTransaction(tab) ? transactionPage : data) && page > pages) setPage(pages);
+  const visible = isTransaction(tab) ? rows : rows.slice((currentPage - 1) * 10, currentPage * 10);
+  const listLoading = loading || (!data && !error) || (isTransaction(tab) && query !== debouncedQuery);
   function describe(row, resource = tab) {
     if (resource === "wallets")
       return (
@@ -250,18 +248,18 @@ export default function AdminDashboardPage({
             {[
               [
                 "Total saldo",
-                sumAmounts(data.wallets, "balance"),
+                data.summary.totals.balance,
                 data.wallets.length + " dompet",
               ],
               [
                 "Total income",
-                sumAmounts(data.incomes),
-                data.incomes.length + " transaksi",
+                data.summary.totals.incomes,
+                data.summary.counts.incomes + " transaksi",
               ],
               [
                 "Total expenses",
-                sumAmounts(data.expenses),
-                data.expenses.length + " transaksi",
+                data.summary.totals.expenses,
+                data.summary.counts.expenses + " transaksi",
               ],
             ].map(([label, value, caption], i) => (
               <Card
@@ -331,17 +329,21 @@ export default function AdminDashboardPage({
         aria-labelledby={"tab-" + tab}
       >
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-semibold">{meta.label}</h2>
-            <p className="mt-1 text-xs text-muted">
-              {rows.length} data
-              {error && data ? " · data terakhir, mungkin belum terbaru" : ""}
-            </p>
+          <div className={isTransaction(tab) ? "flex w-full min-w-0 items-center justify-between gap-3 sm:w-auto sm:flex-1" : ""}>
+            <div className="min-w-0">
+              <h2 className="text-xl font-semibold">{meta.label}</h2>
+              <p className="mt-1 text-xs text-muted">
+                {isTransaction(tab) ? (transactionPage?.meta.total ?? 0) : rows.length} {isTransaction(tab) ? "transaksi" : "data"}
+                {error && data ? " · data terakhir, mungkin belum terbaru" : ""}
+              </p>
+            </div>
+            {isTransaction(tab) && <PeriodFilter value={period} disabled={blocked} onChange={(next) => { setPeriod(next); setPage(1); }} />}
           </div>
           <div className="flex min-w-0 max-w-full flex-wrap gap-3">
             <input
               aria-label={"Cari " + meta.label}
               placeholder={"Cari " + meta.singular + "…"}
+              maxLength={200}
               value={query}
               onChange={(e) => {
                 setQuery(e.target.value);
@@ -366,7 +368,7 @@ export default function AdminDashboardPage({
             saldo dikelola melalui transaksi.
           </p>
         )}
-        {loading && (
+        {listLoading && (
           <p role="status" className="mb-4 text-sm text-muted">
             Memuat pembukuan…
           </p>
@@ -452,13 +454,14 @@ export default function AdminDashboardPage({
               </tbody>
             </table>
           </div>
-          {!visible.length && !loading && (
+          {!visible.length && !listLoading && !error && (
             <p className="p-8 text-center text-sm text-muted">
-              {query
+              {isTransaction(tab) ? "Tidak ada transaksi pada filter ini" : query
                 ? "Tidak ada data yang cocok."
                 : "Belum ada data. Mulai dengan tombol tambah."}
             </p>
           )}
+          {transactionPage && !listLoading && <TransactionTotal total={transactionPage.summary.total_amount} />}
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-primary/10 p-4 text-xs text-muted">
             <span>
               Halaman {currentPage} dari {pages}
@@ -467,7 +470,7 @@ export default function AdminDashboardPage({
               <Button
                 size="sm"
                 variant="ghost"
-                disabled={currentPage === 1}
+                disabled={listLoading || blocked || currentPage === 1}
                 onClick={() => setPage(currentPage - 1)}
               >
                 Sebelumnya
@@ -475,7 +478,7 @@ export default function AdminDashboardPage({
               <Button
                 size="sm"
                 variant="ghost"
-                disabled={currentPage === pages}
+                disabled={listLoading || blocked || currentPage === pages}
                 onClick={() => setPage(currentPage + 1)}
               >
                 Berikutnya
@@ -488,7 +491,7 @@ export default function AdminDashboardPage({
         <RecordEditor
           resource={dialog.resource}
           record={dialog.record}
-          data={data}
+          data={loaded?.value}
           onClose={() => setDialog(null)}
           onChanged={changed}
           onCooldown={cooldown}

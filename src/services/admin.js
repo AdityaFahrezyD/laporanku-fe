@@ -1,3 +1,4 @@
+import { fetchTransactionPage, fetchSummary } from './transactions.js'
 import { ApiError, getJson, requestJson } from './api.js'
 import { readCsrfToken } from './auth.js'
 
@@ -9,15 +10,20 @@ export const resources = [
   { id: 'categories', label: 'Kategori', singular: 'kategori', key: 'category_id', icon: 'grid' },
 ]
 export function isTransaction(resource) { return ['incomes', 'expenses', 'transfers'].includes(resource) }
-export async function fetchAdminData(options) {
-  const results = await Promise.allSettled(resources.map(async ({ id, key }) => {
-    const result = await getJson('/api/' + id, options)
-    if (!Array.isArray(result?.data) || result.data.some((row) => typeof row?.[key] !== 'string')) throw new ApiError('Respons daftar tidak valid.')
-    return result.data
-  }))
-  const errors = results.filter((r) => r.status === 'rejected').map((r) => r.reason)
+export async function fetchAdminData(options, filters = { resource: 'incomes' }) {
+  const results = await Promise.allSettled([
+    ...['wallets', 'categories'].map(async resource => {
+      const result = await getJson('/api/' + resource, options)
+      const key = resources.find(item => item.id === resource).key
+      if (!Array.isArray(result?.data) || result.data.some(row => typeof row?.[key] !== 'string')) throw new ApiError('Respons daftar tidak valid.')
+      return result.data
+    }),
+    fetchSummary(options),
+    isTransaction(filters.resource) ? fetchTransactionPage(filters.resource, filters, options) : Promise.resolve(null),
+  ])
+  const errors = results.filter(r => r.status === 'rejected').map(r => r.reason)
   if (errors.length) throw errors.sort((a, b) => (b.retryAt || 0) - (a.retryAt || 0))[0]
-  return Object.fromEntries(resources.map((r, i) => [r.id, results[i].value]))
+  return { wallets: results[0].value, categories: results[1].value, summary: results[2].value, transactionPage: results[3].value }
 }
 export async function mutate(path, method, body, options = {}) {
   await requestJson('/sanctum/csrf-cookie', options)

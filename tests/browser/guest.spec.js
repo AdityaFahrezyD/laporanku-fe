@@ -1,4 +1,7 @@
+import { queryFixture } from '../queryFixture.js'
 import { test, expect } from '@playwright/test'
+
+test.beforeEach(async ({ page }) => { await page.clock.setFixedTime(new Date('2026-09-14T03:00:00Z')) })
 
 const labels = { incomes: 'Pemasukan', expenses: 'Pengeluaran', transfers: 'Transfer' }
 const keys = { incomes: 'income_id', expenses: 'expense_id', transfers: 'transfer_id' }
@@ -15,6 +18,8 @@ async function setup(page, hash = '', count = 11) {
   const state = { fail: false }
   await page.route('**/api/**', route => {
     if (route.request().url().includes('/attachments/')) return route.fallback()
+    const paginated = queryFixture(db, route.request().url())
+    if (paginated && !state.fail) return route.fulfill({ json: paginated })
     const resource = new URL(route.request().url()).pathname.split('/').pop()
     return route.fulfill({ status: resource === 'user' ? 401 : state.fail ? 429 : 200,
       headers: state.fail ? { 'Retry-After': '60' } : {}, contentType: 'application/json', body: JSON.stringify({ data: db[resource] || [] }) })
@@ -121,7 +126,7 @@ for (const [resource, label] of Object.entries(labels)) {
     db[resource] = []
     await page.getByRole('button', { name: 'Muat ulang', exact: true }).click()
     await expect(rows).toHaveCount(0)
-    await expect(page.getByText(`Belum ada transaksi ${label.toLowerCase()} dalam pembukuan ini.`)).toBeVisible()
+    await expect(page.getByText('Tidak ada transaksi pada filter ini')).toBeVisible()
     await expect(page.getByRole('button', { name: 'Sebelumnya' })).toBeDisabled()
   })
 }
@@ -146,7 +151,7 @@ test('navigation resets pagination and supports history, reload and mobile', asy
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
 })
 
-test('unknown hash falls back to summary and cooldown keeps data on transaction views', async ({ page }) => {
+test('unknown hash falls back to summary and cooldown blocks new transaction requests', async ({ page }) => {
   const { state } = await setup(page, '#unknown')
   await expect(page.getByRole('heading', { name: 'Ringkasan keuangan' })).toBeVisible()
   await navigate(page, 'Pemasukan')
@@ -154,7 +159,7 @@ test('unknown hash falls back to summary and cooldown keeps data on transaction 
   await page.getByRole('button', { name: 'Muat ulang', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('HTTP 429')
   await expect(page.getByRole('button', { name: /Tunggu \d+ detik/ })).toBeDisabled()
-  await expect(page.locator('tbody tr')).toHaveCount(10)
+  await expect(page.locator('tbody tr')).toHaveCount(0)
   await navigate(page, 'Transfer')
   await expect(page.getByRole('alert')).toBeVisible()
   await expect(page.getByRole('button', { name: /Tunggu \d+ detik/ })).toBeDisabled()

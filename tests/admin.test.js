@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { queryFixture } from './queryFixture.js'
 import { dateInput, payload, mutate, uploadAttachment, fetchAdminData } from '../src/services/admin.js'
 
 test('transaction payload uses WIB and preserves decimal strings', () => {
@@ -42,8 +43,8 @@ test('missing CSRF stops mutations and 422 keeps backend field errors', async ()
 })
 test('admin load includes categories and rejects partial results', async () => {
   const paths = []
-  const data = await fetchAdminData({ baseUrl: '', fetcher: async (url) => { paths.push(url); return new Response('{"data":[]}') } })
-  assert.equal(paths.length, 5)
+  const data = await fetchAdminData({ baseUrl: '', fetcher: async (url) => { paths.push(url); return new Response(JSON.stringify(queryFixture({}, url) || { data: [] })) } })
+  assert.equal(paths.length, 4)
   assert.deepEqual(data.categories, [])
   await assert.rejects(fetchAdminData({ baseUrl: '', fetcher: async (url) => url.endsWith('categories') ? new Response('{}', { status: 500 }) : new Response('{"data":[]}') }))
 })

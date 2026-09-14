@@ -1,5 +1,8 @@
+import { queryFixture } from '../queryFixture.js'
 import { test, expect } from '@playwright/test'
 import * as mock from '../../src/data/dashboardMock.js'
+
+test.beforeEach(async ({ page }) => { await page.clock.setFixedTime(new Date('2026-09-14T03:00:00Z')) })
 
 async function checkStickyAmount(table) {
   const scroller = table.locator('..')
@@ -48,6 +51,8 @@ for (const role of ['guest', 'admin']) {
       data.incomes[0].amount = '9999999999999.99'
       data.incomes[0].income_wallet = { ...data.wallets[0], name: 'Bank BNI' }
       await page.route('**/api/**', (route) => {
+        const paginated = queryFixture(data, route.request().url())
+        if (paginated) return route.fulfill({ json: paginated })
         const key = new URL(route.request().url()).pathname.split('/').pop()
         return route.fulfill({ status: key === 'user' && role === 'guest' ? 401 : 200, contentType: 'application/json',
           body: JSON.stringify(key === 'user' ? { id: 'admin', role, name: 'Administrator' } : { data: data[key] || [] }) })
