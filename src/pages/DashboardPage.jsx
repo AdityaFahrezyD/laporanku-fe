@@ -10,6 +10,8 @@ import {
 } from "../components";
 import TransactionTable from "../components/organisms/TransactionTable";
 import PeriodFilter from "../components/organisms/PeriodFilter";
+import CategoryFilter from "../components/organisms/CategoryFilter";
+import { categoriesFor } from "../utils/categories";
 import WalletCards from "../components/organisms/WalletCards";
 import useDashboard from "../hooks/useDashboard";
 import { FETCH_BASE_URL } from "../services/api";
@@ -60,8 +62,13 @@ export default function DashboardPage({
   const [page, setPage] = useState(1);
   const [period, setPeriod] = useState({ mode: "all" });
   const [query, setQuery] = useState("");
+  const [categoryId, setCategoryId] = useState("");
   const debouncedQuery = useDebouncedValue(query);
-  const { data, transactionPage: loadedPage, loading, listLoading, refreshing, error, updatedAt, retryIn, refresh } = useDashboard({ resource: view, page, period, query: debouncedQuery }, user);
+  const { data, transactionPage: loadedPage, loading, listLoading, refreshing, error, updatedAt, retryIn, refresh } = useDashboard({ resource: view, page, period, query: debouncedQuery, categoryId }, user);
+  if (categoryId && data?.categories && !categoriesFor(view, data.categories).some(category => category.category_id === categoryId)) {
+    setCategoryId("");
+    setPage(1);
+  }
   const searching = query !== debouncedQuery;
   const { wallets = [] } = data || {};
   const isSummary = view === "ringkasan";
@@ -72,6 +79,7 @@ export default function DashboardPage({
   if (transactionPage && page > pages) setPage(pages);
   const visible = transactions;
   function navigate(id) {
+    setCategoryId("");
     setQuery("");
     setView(Object.hasOwn(views, id) ? id : "ringkasan");
     setPage(1);
@@ -212,6 +220,7 @@ export default function DashboardPage({
               </span> : <PeriodFilter value={period} disabled={retryIn > 0} onChange={(next) => { setPeriod(next); setPage(1); }} />}
             </div>
             {!isSummary && <input aria-label="Cari transaksi" placeholder="Cari transaksi…" maxLength={200} value={query} onChange={e => { setQuery(e.target.value); setPage(1); }} className="mb-4 w-full rounded-xl border border-primary/15 bg-white px-4 py-3 text-sm" />}
+            {['incomes', 'expenses'].includes(view) && <div className="mb-4"><CategoryFilter resource={view} categories={data?.categories} value={categoryId} disabled={retryIn > 0} onChange={value => { setCategoryId(value); setPage(1); }} /></div>}
             {(listLoading || searching) && !isSummary ? <p role="status">Sedang memuat transaksi…</p> : ((isSummary && data) || transactionPage) && <TransactionTable
               transactions={visible}
               types={types}

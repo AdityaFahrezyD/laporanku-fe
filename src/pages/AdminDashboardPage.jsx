@@ -10,6 +10,8 @@ import {
 import WalletCards from "../components/organisms/WalletCards";
 import RecordEditor from "../components/organisms/RecordEditor";
 import PeriodFilter from "../components/organisms/PeriodFilter";
+import CategoryFilter from "../components/organisms/CategoryFilter";
+import { categoriesFor } from "../utils/categories";
 import TransactionTotal from "../components/molecules/TransactionTotal";
 import { FETCH_BASE_URL, getJson } from "../services/api";
 import {
@@ -43,11 +45,16 @@ export default function AdminDashboardPage({
   const [dialog, setDialog] = useState(null);
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
+  const [categoryId, setCategoryId] = useState("");
   const [page, setPage] = useState(1);
   const [period, setPeriod] = useState({ mode: "all" });
   const debouncedQuery = useDebouncedValue(query);
-  const dashboard = useDashboardQueries({ resource: tab, page, period, query: debouncedQuery }, user);
+  const dashboard = useDashboardQueries({ resource: tab, page, period, query: debouncedQuery, categoryId }, user);
   const { data, loading, refreshing, retryIn, cooldown } = dashboard;
+  if (categoryId && data?.categories && !categoriesFor(tab, data.categories).some(category => category.category_id === categoryId)) {
+    setCategoryId("");
+    setPage(1);
+  }
   const error = actionError || dashboard.error;
   const transactionPage = query === debouncedQuery ? dashboard.transactionPage : null;
   const opening = useRef(false);
@@ -56,6 +63,7 @@ export default function AdminDashboardPage({
   useEffect(() => {
     const onHash = () => {
       setTab(initialTab());
+      setCategoryId("");
       setQuery("");
       setPage(1);
     };
@@ -77,6 +85,7 @@ export default function AdminDashboardPage({
       return;
     }
     setTab(id);
+    setCategoryId("");
     setQuery("");
     setPage(1);
     window.history.replaceState(null, "", "#" + id);
@@ -330,6 +339,7 @@ export default function AdminDashboardPage({
             saldo dikelola melalui transaksi.
           </p>
         )}
+        {['incomes', 'expenses'].includes(tab) && <div className="mb-4"><CategoryFilter resource={tab} categories={data?.categories} value={categoryId} disabled={blocked} onChange={value => { setCategoryId(value); setPage(1); }} /></div>}
         {listLoading && (
           <p role="status" className="mb-4 text-sm text-muted">
             Memuat pembukuan…

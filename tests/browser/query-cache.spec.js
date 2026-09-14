@@ -74,7 +74,7 @@ for (const role of ['guest', 'admin']) {
       expect(count('expenses')).toBe(1)
       expect(count('wallets')).toBe(1)
       expect(count('dashboard-summary')).toBe(1)
-      expect(count('categories')).toBe(role === 'admin' ? 1 : 0)
+      expect(count('categories')).toBe(1)
       await page.getByRole('button', { name: 'Berikutnya', exact: true }).click()
       await expect(page.locator('tbody tr')).toHaveCount(2)
       await page.getByRole('button', { name: 'Sebelumnya', exact: true }).click()

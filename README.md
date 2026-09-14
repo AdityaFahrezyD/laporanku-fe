@@ -96,7 +96,7 @@ import { Placeholder } from './components'
 
 ## Kontrak data
 
-Dashboard mengambil `GET /api/wallets`, `/api/dashboard-summary`, dan halaman transaksi tab aktif dengan cookie serta header `Accept: application/json`. Relasi kategori sudah tersedia pada daftar transaksi, sehingga dashboard publik tidak meminta daftar kategori terpisah.
+Dashboard mengambil `GET /api/wallets`, `/api/dashboard-summary`, dan halaman transaksi tab aktif dengan cookie serta header `Accept: application/json`. Dashboard publik juga mengambil `/api/categories` ketika membuka pemasukan atau pengeluaran untuk pilihan filter. Admin memuat kategori sejak dashboard dibuka untuk filter dan formulir.
 
 Saldo mencakup seluruh wallet termasuk yang nonaktif. Total pemasukan dan pengeluaran memakai seluruh periode; transfer tidak menambah kedua total tersebut. Lima transaksi terbaru digabung dan diurutkan oleh backend. Total berasal dari agregasi database sebagai string desimal; frontend memformat nominal dengan integer sen (BigInt) dan menampilkan tanggal dalam WIB.
 
@@ -118,7 +118,7 @@ bersama saat berpindah antara ketiga jenis transaksi dan bertahan selama muat
 ulang data serta CRUD. Reload browser mengembalikannya ke Semua waktu.
 
 Jumlah transaksi dan **Total hasil filter** dihitung dari seluruh hasil sebelum
-pagination 10 baris, termasuk pencarian publik dan admin. Mengganti periode atau pencarian
+pagination 10 baris, termasuk pencarian publik dan admin. Mengganti periode, kategori, atau pencarian
 mengembalikan halaman ke halaman pertama. Total berada di bawah tabel, sebelum
 pagination, dan tetap terlihat saat tabel digeser horizontal. Hasil kosong
 menampilkan Rp 0. Filter yang belum pernah dimuat tidak menampilkan total selama
@@ -126,11 +126,25 @@ menunggu. Hasil filter yang sudah tersedia tetap tampil saat diperbarui, dengan
 indikator pembaruan atau pemberitahuan apabila pembaruan gagal.
 
 Filter dan total dihitung backend dari seluruh hasil yang cocok; perubahan periode,
-pencarian, dan halaman mengirim permintaan baru. Total transfer menghitung setiap
+pencarian, kategori, dan halaman meminta hasil sesuai kombinasi filter, memakai cache bila masih segar. Total transfer menghitung setiap
 transfer sekali. Ringkasan saldo dan total
 pada kartu ringkasan tetap mencakup seluruh periode. Dompet, kategori, dan hak
 akses tidak dipengaruhi filter. Tes browser memakai tanggal tetap agar fixture
 tidak bergantung pada waktu eksekusi.
+
+## Filter kategori transaksi
+
+Dashboard publik dan admin menyediakan pilihan kategori pada pemasukan dan
+pengeluaran. Pilihan berasal dari record `/api/categories`, hanya menampilkan
+jenis yang sesuai (`income` atau `expense`), dan diurutkan berdasarkan nama A–Z.
+Default **Semua kategori** mencakup transaksi berkategori maupun tanpa kategori.
+Kategori yang belum memiliki transaksi tetap tersedia; hasilnya kosong dengan total 0.
+
+Filter kategori digabung dengan periode dan pencarian di backend. Mengganti
+kategori kembali ke halaman 1. Berpindah tab kembali ke Semua kategori, sedangkan
+periode tetap dipertahankan. Transfer tidak memiliki filter kategori. Setelah
+CRUD dan pembaruan master data, pilihan mengikuti record terbaru; kategori
+terpilih yang dihapus atau berubah jenis dikembalikan ke Semua kategori.
 
 ## Deployment
 
@@ -200,7 +214,7 @@ Jalankan juga `npm test`, `npm run lint`, dan `npm run build`.
 
 ### Pemuatan dan navigasi frontend
 
-Ringkasan, dompet, kategori admin, dan setiap halaman transaksi memiliki status
+Ringkasan, dompet, kategori, dan setiap halaman transaksi memiliki status
 pemuatan terpisah. Berpindah menu/filter/halaman tidak memuat ulang seluruh data
 dasar selama hasilnya masih segar. Kartu dan pilihan formulir tetap terpasang;
 halaman transaksi yang belum pernah dibuka hanya menampilkan loading di tabel.
@@ -209,7 +223,7 @@ Hasil disimpan **di memori selama dashboard aktif**, dengan masa segar **60 deti
 Kembali ke key yang sama selama masa tersebut menampilkan hasil langsung tanpa
 request. Hasil yang lebih lama tetap terlihat dengan indikator **Memperbarui…**
 sementara backend diperiksa. Kesegaran dievaluasi saat navigasi; tidak ada polling.
-Key halaman memakai jenis transaksi, tanggal awal/akhir, pencarian, halaman, dan
+Key halaman memakai jenis transaksi, tanggal awal/akhir, kategori, pencarian, halaman, dan
 ukuran halaman. Baris, metadata halaman, dan total disimpan sebagai satu hasil.
 Maksimal 30 hasil halaman disimpan, dengan penghapusan yang paling lama tidak
 digunakan. Ringkasan dan master data tidak ikut batas 30 halaman tersebut.
@@ -230,7 +244,10 @@ dashboard dimuat agar admin tidak memicu pemuatan guest sementara.
 Tab transaksi publik dan admin memakai pagination server, 10 baris per halaman.
 Periode awal adalah Semua waktu; pencarian memakai debounce 300 ms. Parameter
 `paginated=1`, `page`, `per_page`, `q`, `start_date`, dan `end_date` dikirim ke
-`/api/incomes`, `/api/expenses`, atau `/api/transfers` sesuai tab aktif. Tanggal
+`/api/incomes`, `/api/expenses`, atau `/api/transfers` sesuai tab aktif. Parameter
+opsional `category_id` hanya dikirim untuk pemasukan/pengeluaran ketika kategori
+tertentu dipilih; backend memvalidasi UUID dan jenis kategori (422 jika tidak sesuai).
+Tanggal
 mewakili hari WIB, termasuk seluruh tanggal akhir. Total hasil filter mencakup
 seluruh halaman dan berasal dari `summary.total_amount` pada respons API.
 

@@ -13,7 +13,8 @@ export default function useDashboardQueries(filters, user) {
   useSyncExternalStore(store.subscribe, store.getSnapshot)
   const [now, setNow] = useState(Date.now)
   const admin = user?.role === 'admin'
-  const basics = admin ? adminKeys : baseKeys
+  const needsCategories = admin || ['incomes', 'expenses'].includes(filters.resource)
+  const basics = needsCategories ? adminKeys : baseKeys
   const transaction = ['incomes', 'expenses', 'transfers'].includes(filters.resource)
   const pageKey = transaction ? transactionPath(filters.resource, filters) : null
   // Encode only the resolved wire parameters: equivalent periods reuse the same page.
@@ -22,12 +23,12 @@ export default function useDashboardQueries(filters, user) {
     const url = new URL(key, 'http://local.invalid')
     const params = url.searchParams
     const period = params.has('start_date') ? { mode: 'range', start: params.get('start_date'), end: params.get('end_date') } : { mode: 'all' }
-    return fetchTransactionPage(url.pathname.split('/').pop(), { period, query: params.get('q') || '', page: Number(params.get('page')) })
+    return fetchTransactionPage(url.pathname.split('/').pop(), { period, query: params.get('q') || '', page: Number(params.get('page')), categoryId: params.get('category_id') || '' })
   }
   useEffect(() => {
-    for (const key of (admin ? adminKeys : baseKeys)) store.ensure(key, () => baseLoader(key))
+    for (const key of (needsCategories ? adminKeys : baseKeys)) store.ensure(key, () => baseLoader(key))
     if (pageKey) store.ensure(pageKey, () => loadPage(pageKey), { page: true })
-  }, [store, admin, pageKey, visitKey])
+  }, [store, needsCategories, pageKey, visitKey])
 
   const cooldown = store.cooldown()
   useEffect(() => {
@@ -49,9 +50,9 @@ export default function useDashboardQueries(filters, user) {
   // An unseen page visited during cooldown stays idle afterwards until the
   // user retries; do not turn it into an endless, non-running loading state.
   const loadingEntry = entry => missing(entry) && (entry ? entry.fetching : !cooldown.error)
-  const baseReady = baseEntries.every(entry => !missing(entry))
+  const baseReady = (admin ? basics : baseKeys).every(key => !missing(store.peek(key)))
   const transactionPage = pageEntry?.data ?? null
-  const data = baseReady ? { ...Object.fromEntries(basics.map(key => [key, store.peek(key).data])), transactionPage } : null
+  const data = baseReady ? { ...Object.fromEntries(basics.map(key => [key, store.peek(key)?.data])), transactionPage } : null
   const initialLoading = baseEntries.some(loadingEntry)
   const listLoading = Boolean(pageKey && loadingEntry(pageEntry))
   const refreshing = entries.some(entry => entry?.fetching && !missing(entry))

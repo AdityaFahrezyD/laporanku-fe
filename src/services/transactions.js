@@ -6,11 +6,12 @@ function validRecord(resource, row) {
   return row && typeof row[keys[resource]] === 'string' && typeof row.amount === 'string' && /^\d+(\.\d{1,2})?$/.test(row.amount) && typeof row.transaction_date === 'string' && Number.isFinite(Date.parse(row.transaction_date))
 }
 
-export function transactionPath(resource, { period = { mode: 'all' }, query = '', page = 1 } = {}) {
+export function transactionPath(resource, { period = { mode: 'all' }, query = '', page = 1, categoryId = '' } = {}) {
   const params = new URLSearchParams({ paginated: '1', page: String(page), per_page: '10' })
   const bounds = periodBounds(period)
   if (bounds) { params.set('start_date', bounds.start); params.set('end_date', bounds.end) }
   if (query) params.set('q', query)
+  if (categoryId && ['incomes', 'expenses'].includes(resource)) params.set('category_id', categoryId)
   return `/api/${resource}?${params}`
 }
 
