@@ -260,3 +260,52 @@ test('cancelling file selection preserves the form and existing attachment selec
   await page.keyboard.press('Escape')
   await expect(dialog).not.toBeVisible()
 })
+
+test('each admin page supports menu links, direct hashes and reload with the shared summary', async ({ page }) => {
+  await setup(page)
+  for (const [resource, label, singular] of [
+    ['incomes', 'Income', 'income'], ['expenses', 'Expenses', 'expense'],
+    ['transfers', 'Transfer', 'transfer'], ['wallets', 'Dompet', 'dompet'],
+    ['categories', 'Kategori', 'kategori'],
+  ]) {
+    await page.getByRole('navigation', { name: 'Navigasi utama' }).getByRole('link', { name: label, exact: true }).click()
+    await expect(page.getByRole('tabpanel')).toHaveAttribute('id', 'panel-' + resource)
+    await page.goto('/#' + resource)
+    await expect(page.getByRole('tab', { name: label, exact: true })).toHaveAttribute('aria-selected', 'true')
+    await page.reload()
+    await expect(page.getByRole('tabpanel')).toHaveAttribute('id', 'panel-' + resource)
+    await expect(page.getByRole('button', { name: '+ Tambah ' + singular, exact: true })).toBeEnabled()
+    await expect(page.getByText('Total saldo', { exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Dompet', exact: true }).first()).toBeVisible()
+  }
+})
+
+test('a pending editor keeps its original resource after hash navigation', async ({ page }) => {
+  const { db, writes } = await setup(page)
+  db.incomes.push({
+    income_id: 'i1', wallet_id: 'w1', amount: '25.00', description: 'Income tertunda',
+    transaction_date: '2026-09-14T03:00:00Z', attachments: [], income_wallet: db.wallets[0],
+  })
+  await page.reload()
+  await expect(page.getByText('Income tertunda', { exact: true })).toBeVisible()
+  let release
+  const gate = new Promise(resolve => { release = resolve })
+  await page.route('**/api/incomes/i1', async route => {
+    if (route.request().method() === 'GET') await gate
+    await route.fallback()
+  })
+  const request = page.waitForRequest('**/api/incomes/i1')
+  try {
+    await page.getByRole('button', { name: 'Edit', exact: true }).click()
+    await request
+    await page.evaluate(() => { window.location.hash = 'expenses' })
+    await expect(page.getByRole('tabpanel')).toHaveAttribute('id', 'panel-expenses')
+  } finally { release() }
+  const dialog = page.getByRole('dialog', { name: 'Edit income', exact: true })
+  await expect(dialog.getByLabel('Nominal (Rp)', { exact: true })).toHaveValue('25,00')
+  await dialog.getByLabel('Nominal (Rp)', { exact: true }).fill('30,00')
+  await dialog.getByRole('button', { name: 'Simpan', exact: true }).click()
+  await expect(dialog).not.toBeVisible()
+  expect(writes.find(write => write.method === 'PATCH')).toMatchObject({ resource: 'incomes', id: 'i1', body: { amount: '30.00' } })
+  await expect(page.getByRole('tabpanel')).toHaveAttribute('id', 'panel-expenses')
+})
