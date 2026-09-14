@@ -159,7 +159,7 @@ test('unknown hash falls back to summary and cooldown blocks new transaction req
   await page.getByRole('button', { name: 'Muat ulang', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('HTTP 429')
   await expect(page.getByRole('button', { name: /Tunggu \d+ detik/ })).toBeDisabled()
-  await expect(page.locator('tbody tr')).toHaveCount(0)
+  await expect(page.locator('tbody tr')).toHaveCount(10)
   await navigate(page, 'Transfer')
   await expect(page.getByRole('alert')).toBeVisible()
   await expect(page.getByRole('button', { name: /Tunggu \d+ detik/ })).toBeDisabled()

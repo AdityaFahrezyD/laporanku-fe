@@ -121,7 +121,9 @@ Jumlah transaksi dan **Total hasil filter** dihitung dari seluruh hasil sebelum
 pagination 10 baris, termasuk pencarian publik dan admin. Mengganti periode atau pencarian
 mengembalikan halaman ke halaman pertama. Total berada di bawah tabel, sebelum
 pagination, dan tetap terlihat saat tabel digeser horizontal. Hasil kosong
-menampilkan Rp 0; selama pemuatan atau ketika pemuatan gagal, total tidak ditampilkan.
+menampilkan Rp 0. Filter yang belum pernah dimuat tidak menampilkan total selama
+menunggu. Hasil filter yang sudah tersedia tetap tampil saat diperbarui, dengan
+indikator pembaruan atau pemberitahuan apabila pembaruan gagal.
 
 Filter dan total dihitung backend dari seluruh hasil yang cocok; perubahan periode,
 pencarian, dan halaman mengirim permintaan baru. Total transfer menghitung setiap
@@ -180,8 +182,9 @@ perubahan field form belum disimpan.
 
 Respons 422 menampilkan error input, 429 membatasi pengiriman sampai Retry-After.
 Setelah perubahan, halaman transaksi aktif, ringkasan, dompet, dan kategori dimuat
-ulang. Hasil transaksi dan total tidak ditampilkan selama pemuatan atau setelah
-kegagalan pemuatan agar hasil filter lama tidak terlihat sebagai hasil terbaru.
+ulang. Hasil aktif tetap tampil dengan indikator Memperbarui…; jika gagal,
+pemberitahuan menjelaskan bahwa data terakhir mungkin belum terbaru. Halaman
+transaksi lain ditandai perlu diperbarui saat dibuka kembali.
 Guest tetap menggunakan dashboard publik tanpa kontrol CRUD; otorisasi sebenarnya
 tetap dilakukan backend.
 
@@ -194,6 +197,35 @@ Tes menggunakan API simulasi; tidak menulis database backend lokal.
 Jalankan juga `npm test`, `npm run lint`, dan `npm run build`.
 
 ## Query transaksi di backend
+
+### Pemuatan dan navigasi frontend
+
+Ringkasan, dompet, kategori admin, dan setiap halaman transaksi memiliki status
+pemuatan terpisah. Berpindah menu/filter/halaman tidak memuat ulang seluruh data
+dasar selama hasilnya masih segar. Kartu dan pilihan formulir tetap terpasang;
+halaman transaksi yang belum pernah dibuka hanya menampilkan loading di tabel.
+
+Hasil disimpan **di memori selama dashboard aktif**, dengan masa segar **60 detik**.
+Kembali ke key yang sama selama masa tersebut menampilkan hasil langsung tanpa
+request. Hasil yang lebih lama tetap terlihat dengan indikator **Memperbarui…**
+sementara backend diperiksa. Kesegaran dievaluasi saat navigasi; tidak ada polling.
+Key halaman memakai jenis transaksi, tanggal awal/akhir, pencarian, halaman, dan
+ukuran halaman. Baris, metadata halaman, dan total disimpan sebagai satu hasil.
+Maksimal 30 hasil halaman disimpan, dengan penghapusan yang paling lama tidak
+digunakan. Ringkasan dan master data tidak ikut batas 30 halaman tersebut.
+
+Muat ulang serta perubahan CRUD/attachment menandai hasil lama perlu diperbarui
+dan meminta data dasar serta halaman aktif segera. Halaman lain diperiksa saat
+dibuka kembali. Respons sebelum invalidasi tidak boleh mengisi kembali cache.
+Saat 429, hasil yang sudah tersedia tetap dapat dibuka tanpa request; setelah
+cooldown selesai, pengguna dapat menekan Muat ulang. Tidak ada retry otomatis.
+
+Penyimpanan dipisahkan per pengguna/role dan dibersihkan saat dashboard dilepas,
+sesi berubah, logout, atau reload browser. Tidak ada penyimpanan API ke
+localStorage, IndexedDB, atau service worker. Pemeriksaan sesi selesai sebelum
+dashboard dimuat agar admin tidak memicu pemuatan guest sementara.
+
+### Kontrak dan rilis
 
 Tab transaksi publik dan admin memakai pagination server, 10 baris per halaman.
 Periode awal adalah Semua waktu; pencarian memakai debounce 300 ms. Parameter

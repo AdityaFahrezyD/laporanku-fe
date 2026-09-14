@@ -61,11 +61,11 @@ export default function DashboardPage({
   const [period, setPeriod] = useState({ mode: "all" });
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebouncedValue(query);
-  const { data, loading, error, updatedAt, retryIn, refresh } = useDashboard({ resource: view, page, period, query: debouncedQuery });
+  const { data, transactionPage: loadedPage, loading, listLoading, refreshing, error, updatedAt, retryIn, refresh } = useDashboard({ resource: view, page, period, query: debouncedQuery }, user);
   const searching = query !== debouncedQuery;
   const { wallets = [] } = data || {};
   const isSummary = view === "ringkasan";
-  const transactionPage = searching ? null : data?.transactionPage;
+  const transactionPage = searching ? null : loadedPage;
   const transactions = isSummary ? (data?.summary.latest || []).map(row => normalizeTransactions({ [row.type + 's']: [row] })[0]) : normalizeTransactions({ [view]: transactionPage?.data || [] });
   const pages = transactionPage?.meta.last_page || 1;
   const currentPage = page;
@@ -113,7 +113,7 @@ export default function DashboardPage({
             )}
             <Button
               variant="outline"
-              loading={loading}
+              loading={loading || refreshing}
               disabled={retryIn > 0}
               onClick={refresh}
             >
@@ -125,6 +125,7 @@ export default function DashboardPage({
             </Button>
           </div>
         </div>
+        {refreshing && <p role="status" className="mb-4 text-sm text-muted">Memperbarui…</p>}
         {error && (
           <Alert
             variant="error"
@@ -211,7 +212,7 @@ export default function DashboardPage({
               </span> : <PeriodFilter value={period} disabled={retryIn > 0} onChange={(next) => { setPeriod(next); setPage(1); }} />}
             </div>
             {!isSummary && <input aria-label="Cari transaksi" placeholder="Cari transaksi…" maxLength={200} value={query} onChange={e => { setQuery(e.target.value); setPage(1); }} className="mb-4 w-full rounded-xl border border-primary/15 bg-white px-4 py-3 text-sm" />}
-            {(loading || searching) && !isSummary ? <p role="status">Sedang memuat transaksi…</p> : (isSummary || transactionPage) && <TransactionTable
+            {(listLoading || searching) && !isSummary ? <p role="status">Sedang memuat transaksi…</p> : ((isSummary && data) || transactionPage) && <TransactionTable
               transactions={visible}
               types={types}
               onDetail={setSelected}
@@ -223,8 +224,8 @@ export default function DashboardPage({
               <nav aria-label="Paginasi transaksi" className="mt-4 flex flex-wrap items-center justify-between gap-3">
                 <p className="text-xs text-muted">Halaman {currentPage} dari {pages}</p>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" disabled={loading || searching || retryIn > 0 || currentPage === 1} onClick={() => setPage(currentPage - 1)}>Sebelumnya</Button>
-                  <Button variant="outline" size="sm" disabled={loading || searching || retryIn > 0 || currentPage === pages} onClick={() => setPage(currentPage + 1)}>Berikutnya</Button>
+                  <Button variant="outline" size="sm" disabled={listLoading || searching || currentPage === 1} onClick={() => setPage(currentPage - 1)}>Sebelumnya</Button>
+                  <Button variant="outline" size="sm" disabled={listLoading || searching || currentPage === pages} onClick={() => setPage(currentPage + 1)}>Berikutnya</Button>
                 </div>
               </nav>
             )}

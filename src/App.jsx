@@ -34,9 +34,11 @@ export default function App() {
   return <InstallProvider>
     {window.location.pathname.replace(/\/$/, '') === '/admin'
       ? <LoginPage user={user} checking={checking} sessionError={sessionError} onAuthenticated={(account) => { setUser(account); setSessionError(null) }} onLogout={handleLogout} />
-      : user?.role === 'admin'
-        ? <AdminDashboardPage user={user} onLogout={handleLogout} loggingOut={loggingOut} sessionError={sessionError} />
-        : <DashboardPage user={user} onLogout={handleLogout} loggingOut={loggingOut} sessionError={sessionError} />}
+      : checking
+        ? <main role="status" className="grid min-h-dvh place-items-center text-sm text-muted">Sedang memuat pembukuan…</main>
+        : user?.role === 'admin'
+          ? <AdminDashboardPage key={user.id + ':' + user.role} user={user} onLogout={handleLogout} loggingOut={loggingOut} sessionError={sessionError} />
+          : <DashboardPage key={user ? user.id + ':' + user.role : 'guest'} user={user} onLogout={handleLogout} loggingOut={loggingOut} sessionError={sessionError} />}
     <PwaControls />
   </InstallProvider>
 }

@@ -13,13 +13,13 @@ import PeriodFilter from "../components/organisms/PeriodFilter";
 import TransactionTotal from "../components/molecules/TransactionTotal";
 import { FETCH_BASE_URL, getJson } from "../services/api";
 import {
-  fetchAdminData,
   isTransaction,
   mutate,
   resources,
 } from "../services/admin";
 import { formatDate, formatRupiah } from "../utils/format";
 import useDebouncedValue from "../hooks/useDebouncedValue";
+import useDashboardQueries from "../hooks/useDashboardQueries";
 
 const walletLabels = {
   bank: "Rekening bank",
@@ -38,10 +38,7 @@ export default function AdminDashboardPage({
   sessionError,
 }) {
   const [tab, setTab] = useState(initialTab);
-  const [loaded, setData] = useState(null);
-  const [revision, setRevision] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [actionError, setError] = useState(null);
   const [notice, setNotice] = useState("");
   const [dialog, setDialog] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -49,15 +46,13 @@ export default function AdminDashboardPage({
   const [page, setPage] = useState(1);
   const [period, setPeriod] = useState({ mode: "all" });
   const debouncedQuery = useDebouncedValue(query);
-  const requestKey = JSON.stringify({ resource: tab, page: isTransaction(tab) ? page : 1, period: isTransaction(tab) ? period : { mode: 'all' }, query: isTransaction(tab) ? debouncedQuery : '', revision });
-  const data = loaded?.key === requestKey ? loaded.value : null;
-  const transactionPage = query === debouncedQuery ? data?.transactionPage : null;
-  const [retryAt, setRetryAt] = useState(0);
-  const [now, setNow] = useState(Date.now);
+  const dashboard = useDashboardQueries({ resource: tab, page, period, query: debouncedQuery }, user);
+  const { data, loading, refreshing, retryIn, cooldown } = dashboard;
+  const error = actionError || dashboard.error;
+  const transactionPage = query === debouncedQuery ? dashboard.transactionPage : null;
   const opening = useRef(false);
-  const cooldownUntil = useRef(0);
   const meta = resources.find((r) => r.id === tab);
-  const blocked = now < retryAt;
+  const blocked = retryIn > 0;
   useEffect(() => {
     const onHash = () => {
       setTab(initialTab());
@@ -67,48 +62,14 @@ export default function AdminDashboardPage({
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
-  useEffect(() => {
-    let active = true;
-    if (Date.now() < cooldownUntil.current) return;
-    fetchAdminData(undefined, JSON.parse(requestKey))
-      .then(
-        (result) => {
-            if (active) { setData({ key: requestKey, value: result }); setError(null); }
-        },
-        (failure) => {
-          if (active) {
-            setError(failure);
-            cooldownUntil.current = failure.retryAt || 0;
-            setRetryAt((old) => Math.max(old, failure.retryAt || 0));
-            setNow(Date.now);
-          }
-        }
-      )
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [requestKey]);
-  useEffect(() => {
-    if (!retryAt) return;
-    const timer = setInterval(() => setNow(Date.now), 1000);
-    return () => clearInterval(timer);
-  }, [retryAt]);
-  function cooldown(failure) {
-    cooldownUntil.current = Math.max(cooldownUntil.current, failure.retryAt || 0);
-    setRetryAt((old) => Math.max(old, failure.retryAt || 0));
-    setNow(Date.now);
-  }
   function refresh() {
-    setLoading(true);
     setError(null);
-    setRevision((old) => old + 1);
+    dashboard.refresh();
   }
   function changed() {
     setNotice("Perubahan tersimpan.");
-    refresh();
+    setError(null);
+    dashboard.changed();
   }
   function navigate(id) {
     if (!resources.some((r) => r.id === id)) {
@@ -154,8 +115,7 @@ export default function AdminDashboardPage({
       setError(failure);
       cooldown(failure);
       setDialog(null);
-      setLoading(true);
-      setRevision((old) => old + 1);
+      dashboard.changed();
     } finally {
       setBusy(false);
     }
@@ -165,7 +125,7 @@ export default function AdminDashboardPage({
   const currentPage = isTransaction(tab) ? page : Math.min(page, pages);
   if ((isTransaction(tab) ? transactionPage : data) && page > pages) setPage(pages);
   const visible = isTransaction(tab) ? rows : rows.slice((currentPage - 1) * 10, currentPage * 10);
-  const listLoading = loading || (!data && !error) || (isTransaction(tab) && query !== debouncedQuery);
+  const listLoading = isTransaction(tab) ? dashboard.listLoading || query !== debouncedQuery : !data && !error;
   function describe(row, resource = tab) {
     if (resource === "wallets")
       return (
@@ -210,16 +170,18 @@ export default function AdminDashboardPage({
           </div>
           <Button
             variant="outline"
-            loading={loading}
+            loading={loading || refreshing}
             disabled={blocked}
             onClick={refresh}
           >
             Muat ulang
           </Button>
         </div>
+        {refreshing && <p role="status" className="mb-4 text-sm text-muted">Memperbarui…</p>}
         {(sessionError || error) && (
           <Alert variant="error" className="mb-4">
             {(sessionError || error).message}
+            {error && data && <p className="mt-1">Data terakhir mungkin belum terbaru.</p>}
             {Object.values(error?.errors || {})
               .flat()
               .map((message, i) => (
@@ -239,7 +201,7 @@ export default function AdminDashboardPage({
         )}
         {blocked && (
           <Alert variant="warning" className="mb-4">
-            Tunggu {Math.max(0, Math.ceil((retryAt - now) / 1000))} detik
+            Tunggu {retryIn} detik
             sebelum mengirim permintaan berikutnya.
           </Alert>
         )}
@@ -470,7 +432,7 @@ export default function AdminDashboardPage({
               <Button
                 size="sm"
                 variant="ghost"
-                disabled={listLoading || blocked || currentPage === 1}
+                disabled={listLoading || currentPage === 1}
                 onClick={() => setPage(currentPage - 1)}
               >
                 Sebelumnya
@@ -478,7 +440,7 @@ export default function AdminDashboardPage({
               <Button
                 size="sm"
                 variant="ghost"
-                disabled={listLoading || blocked || currentPage === pages}
+                disabled={listLoading || currentPage === pages}
                 onClick={() => setPage(currentPage + 1)}
               >
                 Berikutnya
@@ -491,7 +453,7 @@ export default function AdminDashboardPage({
         <RecordEditor
           resource={dialog.resource}
           record={dialog.record}
-          data={loaded?.value}
+          data={data}
           onClose={() => setDialog(null)}
           onChanged={changed}
           onCooldown={cooldown}

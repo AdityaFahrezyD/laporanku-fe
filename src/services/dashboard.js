@@ -17,6 +17,13 @@ function readList(resource, response) {
   return records
 }
 
+export async function fetchMasterList(resource, options) {
+  const response = await getJson(`/api/${resource}`, options)
+  if (resource === 'wallets') return readList(resource, response)
+  if (!Array.isArray(response?.data) || response.data.some(row => typeof row?.category_id !== 'string')) throw new ApiError('Respons daftar tidak valid.')
+  return response.data
+}
+
 export async function fetchDashboard(options, filters = { resource: 'ringkasan' }) {
   const results = await Promise.allSettled([
     getJson('/api/wallets', options).then(result => readList('wallets', result)),
@@ -26,13 +33,6 @@ export async function fetchDashboard(options, filters = { resource: 'ringkasan' 
   const failures = results.filter(result => result.status === 'rejected').map(result => result.reason)
   if (failures.length) throw failures.sort((a, b) => (b.retryAt || 0) - (a.retryAt || 0))[0]
   return { wallets: results[0].value, summary: results[1].value, transactionPage: results[2].value }
-}
-
-const pending = new Map()
-export function loadDashboard(filters) {
-  const key = JSON.stringify(filters)
-  if (!pending.has(key)) pending.set(key, fetchDashboard(undefined, filters).finally(() => pending.delete(key)))
-  return pending.get(key)
 }
 
 export function normalizeTransactions({ incomes = [], expenses = [], transfers = [] }) {

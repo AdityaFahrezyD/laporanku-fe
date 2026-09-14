@@ -136,7 +136,8 @@ for (const role of ['guest', 'admin']) {
       state.fail = true
       await page.getByRole('button', { name: 'Muat ulang', exact: true }).click()
       await expect(page.getByRole('alert')).toBeVisible()
-      await expect(total(page)).toHaveCount(0)
+      await expect(total(page)).toContainText('Rp 310,36')
+      await expect(page.getByText(/Data terakhir mungkin|hasil pemuatan terakhir/)).toBeVisible()
     })
   }
 
