@@ -13,12 +13,12 @@ export default function AttachmentPicker({ file, disabled, onChange, onRemove, o
     onPreparing(true)
     try {
       if (!['image/jpeg', 'image/png', 'image/webp', 'image/avif'].includes(chosen.type)) throw new ApiError('Pilih gambar JPG, PNG, WebP, atau AVIF.')
-      if (chosen.size > 5 * 1024 * 1024) throw new ApiError('Ukuran gambar maksimal 5 MB.')
+      if (chosen.size > 7 * 1024 * 1024) throw new ApiError('Ukuran gambar maksimal 5 MB.')
       // The backend validates file content, animation and pixel count again.
       const bitmap = await createImageBitmap(chosen)
       const pixels = bitmap.width * bitmap.height
       bitmap.close()
-      if (pixels > 10000000) throw new ApiError('Gambar maksimal 10 juta piksel. Perkecil resolusinya sebelum memilih.')
+      if (pixels > 20000000) throw new ApiError('Gambar maksimal 10 juta piksel. Perkecil resolusinya sebelum memilih.')
       setPreview(URL.createObjectURL(chosen))
       onChange(chosen)
     } catch (failure) { setError(failure instanceof ApiError ? failure.message : 'Gambar tidak dapat dibaca oleh browser.') }
