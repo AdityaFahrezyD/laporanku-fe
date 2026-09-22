@@ -56,6 +56,7 @@ for (const resource of ['incomes', 'expenses', 'transfers']) {
       assert.equal(payload(resource, values, editing).admin_fee, '2500.50')
       assert.equal(payload(resource, { ...values, admin_fee: '0' }, editing).admin_fee, '0')
       assert.equal(payload(resource, { ...values, admin_fee: undefined }, editing).admin_fee, '0.00')
+      assert.equal(payload(resource, { ...values, admin_fee: '' }, editing).admin_fee, '0.00')
     }
   })
 }

@@ -99,6 +99,7 @@ test('money input formats typing, preserves caret and blocks invalid submissions
   await form.getByRole('button', { name: 'Simpan', exact: true }).click()
   await expect(form).not.toBeVisible()
   expect(writes[0].body.amount).toBe('1000.50')
+  expect(writes[0].body.admin_fee).toBe('0.00')
   await page.getByRole('button', { name: 'Edit', exact: true }).click()
   await expect(page.getByRole('dialog').getByLabel('Nominal (Rp)', { exact: true })).toHaveValue('1.000,50')
 })
@@ -319,7 +320,8 @@ for (const width of [1280, 390]) {
       await page.getByRole('button', { name: '+ Tambah ' + singular, exact: true }).click()
       const form = page.getByRole('dialog')
       const fee = form.getByLabel('Biaya admin (Rp)', { exact: true })
-      await expect(fee).toHaveValue('0,00')
+      await expect(fee).toHaveValue('')
+      await expect(fee).toHaveAttribute('placeholder', '0 jika tidak ada')
       if (resource === 'transfers') {
         await form.getByLabel('Dompet asal', { exact: true }).selectOption('w1')
         await form.getByLabel('Dompet tujuan', { exact: true }).selectOption('w2')
@@ -360,7 +362,8 @@ test('admin fee validates input, locks during saving and displays backend field 
   const fee = form.getByLabel('Biaya admin (Rp)', { exact: true })
   await form.getByLabel('Dompet', { exact: true }).selectOption('w1')
   await form.getByLabel('Nominal (Rp)', { exact: true }).fill('1000')
-  for (const invalid of ['', '-1', '1,234', '10000000000000']) {
+  expect(await fee.evaluate(el => el.validity.valid)).toBe(true)
+  for (const invalid of ['-1', '1,234', '10000000000000']) {
     await fee.fill(invalid)
     await form.getByRole('button', { name: 'Simpan', exact: true }).click()
     expect(await fee.evaluate(el => el.validity.valid)).toBe(false)

@@ -16,7 +16,7 @@ export default function RecordEditor({ resource, record, data, onClose, onChange
   const [values, setValues] = useState(() => ({
     name: record?.name || '', type: record?.type || (resource === 'wallets' ? 'bank' : 'income'),
     balance: '0.00', is_active: record?.is_active ?? true,
-    amount: record?.amount || '', admin_fee: record?.admin_fee ?? '0.00', description: record?.description || '',
+    amount: record?.amount || '', admin_fee: record ? (record.admin_fee ?? '0.00') : '', description: record?.description || '',
     transaction_date: dateInput(record?.transaction_date),
     wallet_id: record?.wallet_id || '', from_wallet_id: record?.from_wallet_id || '', to_wallet_id: record?.to_wallet_id || '', category_id: record?.category_id || '',
   }))
@@ -88,7 +88,7 @@ export default function RecordEditor({ resource, record, data, onClose, onChange
       </> : <>
         <div className="grid gap-5 sm:grid-cols-2">{resource === 'transfers' ? <>{walletField('from_wallet_id', 'Dompet asal')}{walletField('to_wallet_id', 'Dompet tujuan')}</> : walletField('wallet_id', 'Dompet')}
           <Field label="Nominal (Rp)" name="amount" errors={error?.errors}><MoneyInput {...props('amount')} onValueChange={(value) => change('amount', value)} min="0.01" required /></Field>
-          <Field label="Biaya admin (Rp)" name="admin_fee" errors={error?.errors}><MoneyInput {...props('admin_fee')} onValueChange={(value) => change('admin_fee', value)} min="0" required /></Field>
+          <Field label="Biaya admin (Rp)" name="admin_fee" errors={error?.errors}><MoneyInput {...props('admin_fee')} onValueChange={(value) => change('admin_fee', value)} min="0" required={Boolean(record)} placeholder={!record ? '0 jika tidak ada' : undefined} /></Field>
           <Field label="Tanggal dan waktu (WIB)" name="transaction_date" errors={error?.errors}><input {...props('transaction_date')} type="datetime-local" required /></Field>
           {resource !== 'transfers' && <Field label="Kategori (opsional)" name="category_id" errors={error?.errors}><select {...props('category_id')}><option value="">Tanpa kategori</option>{data.categories.filter((category) => category.type === meta.singular).map((category) => <option key={category.category_id} value={category.category_id}>{category.name}</option>)}</select></Field>}
         </div>

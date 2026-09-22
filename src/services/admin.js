@@ -54,7 +54,7 @@ export function payload(resource, values, editing = false) {
   const [date, time] = values.transaction_date.split('T')
   const [year, month, day] = date.split('-')
   return {
-    amount: values.amount, admin_fee: values.admin_fee ?? '0.00', description: values.description || null, transaction_date: day + '-' + month + '-' + year + ' ' + time,
+    amount: values.amount, admin_fee: values.admin_fee || '0.00', description: values.description || null, transaction_date: day + '-' + month + '-' + year + ' ' + time,
     ...(resource === 'transfers' ? { from_wallet_id: values.from_wallet_id, to_wallet_id: values.to_wallet_id } : { wallet_id: values.wallet_id, category_id: values.category_id || null }),
   }
 }

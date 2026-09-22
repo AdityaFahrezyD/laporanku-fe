@@ -1,14 +1,14 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { formatMoneyInput, moneyInputError, parseMoneyInput } from '../../utils/moneyInput'
 
-export default function MoneyInput({ value, onValueChange, min = '0', ...props }) {
+export default function MoneyInput({ value, onValueChange, min = '0', required = true, ...props }) {
   const input = useRef(null)
   const caret = useRef(null)
   // Preserve incomplete or invalid edits so they can be corrected, never silently rounded.
   const [draft, setDraft] = useState(null)
   const display = draft?.value === value ? draft.display : formatMoneyInput(value)
   useLayoutEffect(() => {
-    input.current.setCustomValidity(moneyInputError(value, min))
+    input.current.setCustomValidity(value === '' && !required ? '' : moneyInputError(value, min))
     if (caret.current !== null) {
       input.current.setSelectionRange(caret.current, caret.current)
       caret.current = null
@@ -43,5 +43,5 @@ export default function MoneyInput({ value, onValueChange, min = '0', ...props }
     }
   }
 
-  return <input {...props} ref={input} type="text" inputMode="decimal" value={display} onChange={change} onKeyDown={keyDown} />
+  return <input {...props} required={required} ref={input} type="text" inputMode="decimal" value={display} onChange={change} onKeyDown={keyDown} />
 }
