@@ -79,6 +79,10 @@ export default function AdminRecordDialogs({ data, actions }) {
               ...(isTransaction(dialog.resource)
                 ? [
                   [
+                    "Biaya admin",
+                    formatRupiah(dialog.record.admin_fee ?? "0.00"),
+                  ],
+                  [
                     "Tanggal (WIB)",
                     formatDate(dialog.record.transaction_date, true),
                   ],

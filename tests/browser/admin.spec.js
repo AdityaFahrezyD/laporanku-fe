@@ -309,3 +309,80 @@ test('a pending editor keeps its original resource after hash navigation', async
   expect(writes.find(write => write.method === 'PATCH')).toMatchObject({ resource: 'incomes', id: 'i1', body: { amount: '30.00' } })
   await expect(page.getByRole('tabpanel')).toHaveAttribute('id', 'panel-expenses')
 })
+
+for (const width of [1280, 390]) {
+  for (const [resource, label, singular] of [['incomes', 'Income', 'income'], ['expenses', 'Expenses', 'expense'], ['transfers', 'Transfer', 'transfer']]) {
+    test(`admin fee create and edit ${resource} at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 844 })
+      const { db, writes } = await setup(page)
+      await page.getByRole('tab', { name: label, exact: true }).click()
+      await page.getByRole('button', { name: '+ Tambah ' + singular, exact: true }).click()
+      const form = page.getByRole('dialog')
+      const fee = form.getByLabel('Biaya admin (Rp)', { exact: true })
+      await expect(fee).toHaveValue('0,00')
+      if (resource === 'transfers') {
+        await form.getByLabel('Dompet asal', { exact: true }).selectOption('w1')
+        await form.getByLabel('Dompet tujuan', { exact: true }).selectOption('w2')
+      } else {
+        await form.getByLabel('Dompet', { exact: true }).selectOption('w1')
+      }
+      await form.getByLabel('Nominal (Rp)', { exact: true }).fill('10.000,00')
+      await fee.fill('2.500,50')
+      await expect(fee).toHaveValue('2.500,50')
+      await fee.scrollIntoViewIfNeeded()
+      const box = await fee.boundingBox()
+      expect(box.x).toBeGreaterThanOrEqual(0)
+      expect(box.x + box.width).toBeLessThanOrEqual(width)
+      expect(await form.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
+      await form.getByRole('button', { name: 'Simpan', exact: true }).click()
+      await expect(form).not.toBeVisible()
+      expect(writes[0]).toMatchObject({ resource, method: 'POST', body: { admin_fee: '2500.50' } })
+      for (const [current, next, canonical] of [['2.500,50', '1.250,25', '1250.25'], ['1.250,25', '0', '0']]) {
+        await page.getByRole('button', { name: 'Edit', exact: true }).click()
+        await expect(fee).toHaveValue(current)
+        await fee.fill(next)
+        await form.getByRole('button', { name: 'Simpan', exact: true }).click()
+        await expect(form).not.toBeVisible()
+        expect(writes.at(-1)).toMatchObject({ resource, method: 'PATCH', body: { admin_fee: canonical } })
+      }
+      // Older records without the new property still open with zero.
+      delete db[resource][0].admin_fee
+      await page.getByRole('button', { name: 'Edit', exact: true }).click()
+      await expect(fee).toHaveValue('0,00')
+    })
+  }
+}
+
+test('admin fee validates input, locks during saving and displays backend field errors', async ({ page }) => {
+  const { writes } = await setup(page)
+  await page.getByRole('button', { name: '+ Tambah income', exact: true }).click()
+  const form = page.getByRole('dialog')
+  const fee = form.getByLabel('Biaya admin (Rp)', { exact: true })
+  await form.getByLabel('Dompet', { exact: true }).selectOption('w1')
+  await form.getByLabel('Nominal (Rp)', { exact: true }).fill('1000')
+  for (const invalid of ['', '-1', '1,234', '10000000000000']) {
+    await fee.fill(invalid)
+    await form.getByRole('button', { name: 'Simpan', exact: true }).click()
+    expect(await fee.evaluate(el => el.validity.valid)).toBe(false)
+    expect(writes).toHaveLength(0)
+  }
+  let release
+  const pending = new Promise(resolve => { release = resolve })
+  await page.route('**/api/incomes', async route => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    await pending
+    return route.fulfill({ status: 422, contentType: 'application/json', body: JSON.stringify({ message: 'Input tidak valid.', errors: { admin_fee: ['Biaya admin tidak boleh melebihi nominal pemasukan.'] } }) })
+  })
+  await fee.fill('2.500,50')
+  const request = page.waitForRequest(request => request.method() === 'POST' && request.url().endsWith('/api/incomes'))
+  try {
+    await form.getByRole('button', { name: 'Simpan', exact: true }).click()
+    await request
+    await expect(fee).toBeDisabled()
+  } finally { release() }
+  await expect(fee).toBeEnabled()
+  await expect(fee).toHaveAttribute('aria-invalid', 'true')
+  const errorId = await fee.getAttribute('aria-describedby')
+  await expect(page.locator('[id=' + JSON.stringify(errorId) + ']')).toHaveText('Biaya admin tidak boleh melebihi nominal pemasukan.')
+  await expect(fee).toHaveValue('2.500,50')
+})

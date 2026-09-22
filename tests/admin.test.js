@@ -6,7 +6,7 @@ import { dateInput, payload, mutate, uploadAttachment, fetchAdminData } from '..
 test('transaction payload uses WIB and preserves decimal strings', () => {
   assert.equal(dateInput('2026-09-10T20:15:00Z'), '2026-09-11T03:15')
   const result = payload('incomes', { amount: '9999999999999.99', description: '', transaction_date: '2026-09-11T03:15', wallet_id: 'wallet', category_id: '' })
-  assert.deepEqual(result, { amount: '9999999999999.99', description: null, transaction_date: '11-09-2026 03:15', wallet_id: 'wallet', category_id: null })
+  assert.deepEqual(result, { amount: '9999999999999.99', admin_fee: '0.00', description: null, transaction_date: '11-09-2026 03:15', wallet_id: 'wallet', category_id: null })
   const transfer = payload('transfers', { amount: '10.00', transaction_date: '2026-09-11T03:15', from_wallet_id: 'a', to_wallet_id: 'b' })
   assert.equal(transfer.from_wallet_id, 'a')
   assert.equal(transfer.to_wallet_id, 'b')
@@ -48,3 +48,14 @@ test('admin load includes categories and rejects partial results', async () => {
   assert.deepEqual(data.categories, [])
   await assert.rejects(fetchAdminData({ baseUrl: '', fetcher: async (url) => url.endsWith('categories') ? new Response('{}', { status: 500 }) : new Response('{"data":[]}') }))
 })
+
+for (const resource of ['incomes', 'expenses', 'transfers']) {
+  test(resource + ' payload preserves admin fees for create and edit', () => {
+    const values = { amount: '10000.00', admin_fee: '2500.50', transaction_date: '2026-09-22T10:30', wallet_id: 'a', from_wallet_id: 'a', to_wallet_id: 'b' }
+    for (const editing of [false, true]) {
+      assert.equal(payload(resource, values, editing).admin_fee, '2500.50')
+      assert.equal(payload(resource, { ...values, admin_fee: '0' }, editing).admin_fee, '0')
+      assert.equal(payload(resource, { ...values, admin_fee: undefined }, editing).admin_fee, '0.00')
+    }
+  })
+}

@@ -23,6 +23,7 @@ export default function GuestTransactionDetail({ selected, onClose }) {
           <dl className="space-y-4 text-sm">
             {[
               ["Deskripsi", selected.description || "Tanpa deskripsi"],
+              ["Biaya admin", formatRupiah(selected.admin_fee ?? "0.00")],
               ["Tanggal", formatDate(selected.transaction_date, true)],
               ...(selected.type === "transfer"
                 ? [
